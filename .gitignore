@@ -1,0 +1,6 @@
+dist/*.pdb
+dist/*.xml
+preview/
+*.user
+*.suo
+.vs/
