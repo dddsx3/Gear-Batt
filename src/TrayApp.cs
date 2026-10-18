@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
@@ -23,6 +25,7 @@ namespace GearBatt
         private bool _menuNeedsRebuild;
         private bool _disposed;
         private Icon _currentIcon;
+        private DateTime _lastUpdated = DateTime.MinValue;
 
         public TrayApp(bool mock)
         {
@@ -57,7 +60,7 @@ namespace GearBatt
             _notifyIcon.Visible = true;
 
             _timer = new System.Windows.Forms.Timer();
-            _timer.Interval = 30000;
+            _timer.Interval = 60000;
             _timer.Tick += delegate { BeginScan(false); };
             _timer.Start();
 
@@ -114,6 +117,7 @@ namespace GearBatt
             if (failure != null)
                 result.AddError(failure.Message);
 
+            _lastUpdated = DateTime.Now;
             _devices = result.Devices;
 
             WirelessDevice selected = FindSelected();
@@ -150,6 +154,8 @@ namespace GearBatt
                 string text = selected.TooltipText;
                 if (!string.IsNullOrEmpty(selected.Source))
                     text += " · " + selected.Source;
+                if (_lastUpdated != DateTime.MinValue)
+                    text += " · " + _lastUpdated.ToString("HH:mm");
                 SetTooltip(text);
             }
             else if (!string.IsNullOrEmpty(_selectedId))
@@ -252,7 +258,7 @@ namespace GearBatt
                 _menu.Items.Add(none);
 
                 ToolStripMenuItem hint = new ToolStripMenuItem(
-                    "需要设备向 Windows 或罗技 HID++ 上报电量");
+                    "需要设备向 Windows、HID++ 或已知私有协议上报电量");
                 hint.Enabled = false;
                 _menu.Items.Add(hint);
             }
@@ -281,6 +287,13 @@ namespace GearBatt
                 }
             }
 
+            ToolStripLabel updated = new ToolStripLabel(
+                _lastUpdated == DateTime.MinValue
+                    ? "上次更新：—"
+                    : "上次更新：" + _lastUpdated.ToString("HH:mm:ss"));
+            updated.ForeColor = SystemColors.GrayText;
+            _menu.Items.Add(updated);
+
             _menu.Items.Add(new ToolStripSeparator());
 
             ToolStripMenuItem refresh = new ToolStripMenuItem(
@@ -297,6 +310,10 @@ namespace GearBatt
             ToolStripMenuItem about = new ToolStripMenuItem("使用说明");
             about.Click += delegate { ShowAbout(); };
             _menu.Items.Add(about);
+
+            ToolStripMenuItem adapt = new ToolStripMenuItem("帮助适配我的设备…");
+            adapt.Click += delegate { ShowAdapterHelp(); };
+            _menu.Items.Add(adapt);
 
             _menu.Items.Add(new ToolStripSeparator());
 
@@ -346,16 +363,51 @@ namespace GearBatt
         private void ShowAbout()
         {
             string text =
-                "Gear-Batt 1.0\n\n" +
+                "Gear-Batt 1.1\n\n" +
                 "显示所选无线设备的电量与充电状态。\n\n" +
                 "支持来源：\n" +
                 "• Windows 电池接口（部分 2.4G 接收器）\n" +
                 "• 罗技 HID++ 2.0（Unifying / Bolt / Lightspeed）\n" +
+                "• ATK/VXE 373B:1216（只读查询）\n" +
+                "• DARKRIM 3654:6901（只读查询）\n" +
                 "• Windows 蓝牙设备电量属性\n\n" +
-                "设备本身必须上报电量。使用私有协议且不向系统上报电量的设备无法读取。\n\n" +
+                "设备本身必须上报电量。使用私有协议且不向系统上报电量的设备无法读取；\n" +
+                "可以运行“帮助适配我的设备…”采集本机数据，帮助后续适配。\n\n" +
                 "左键单击托盘图标可选择要显示的设备；悬停可查看精确电量。";
             MessageBox.Show(
                 text, "关于 Gear-Batt",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void ShowAdapterHelp()
+        {
+            string directory = Path.GetDirectoryName(Application.ExecutablePath);
+            string collector = string.IsNullOrEmpty(directory)
+                ? "Gear-Batt-Collector.exe"
+                : Path.Combine(directory, "Gear-Batt-Collector.exe");
+            if (File.Exists(collector))
+            {
+                try
+                {
+                    Process.Start(collector);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        "无法启动数据采集器：\n" + ex.Message,
+                        "Gear-Batt", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+
+            MessageBox.Show(
+                "Gear-Batt 提供完全自愿的数据采集器，用于帮助适配更多 2.4G 设备。\n\n" +
+                "请下载并运行与主程序同目录的 Gear-Batt-Collector.exe。\n" +
+                "它会生成一份只保存在本机的报告，你可以在检查后手动附加到 GitHub Issue。\n" +
+                "本程序不会自动上传任何数据。\n\n" +
+                "项目地址：\nhttps://github.com/dddsx3/Gear-Batt",
+                "帮助适配我的设备",
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 

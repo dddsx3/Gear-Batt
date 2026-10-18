@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -165,7 +166,7 @@ namespace GearBatt
             }
 
             report.AppendLine();
-            report.AppendLine("Hint: only devices that report battery to Windows, Logitech HID++, or the Bluetooth battery property can be listed.");
+            report.AppendLine("Hint: only devices that report battery to Windows, Logitech HID++, ATK/VXE, DARKRIM, or the Bluetooth battery property can be listed.");
 
             string path = string.IsNullOrEmpty(outPath)
                 ? Path.Combine(Path.GetTempPath(), "GearBatt-diag.txt")
@@ -200,25 +201,36 @@ namespace GearBatt
             int failures = 0;
             sb.AppendLine("Gear-Batt self-test");
 
-            HidppBattery battery = HidppProvider.ParseBatteryLevelStatus(
-                new byte[] { 87, 1, 1 });
-            Check(sb, ref failures, "0x1001 charging",
+            HidppBattery battery = HidppProvider.ParseBatteryStatus(
+                new byte[] { 87, 80, 1 });
+            Check(sb, ref failures, "0x1000 charging",
                 battery != null && battery.Percent == 87 && battery.Charging);
 
-            battery = HidppProvider.ParseBatteryLevelStatus(
-                new byte[] { 42, 0, 0 });
-            Check(sb, ref failures, "0x1001 battery",
+            battery = HidppProvider.ParseBatteryStatus(
+                new byte[] { 42, 40, 0 });
+            Check(sb, ref failures, "0x1000 battery",
                 battery != null && battery.Percent == 42 && !battery.Charging);
 
+            battery = HidppProvider.ParseBatteryStatus(
+                new byte[] { 0, 0, 0 });
+            Check(sb, ref failures, "0x1000 zero is unknown",
+                battery != null && battery.Percent == -1);
+
             battery = HidppProvider.ParseUnifiedBattery(
-                new byte[] { 55, 0, 1, 1 });
+                new byte[] { 55, 0, 1, 0 });
             Check(sb, ref failures, "0x1004 charging",
                 battery != null && battery.Percent == 55 && battery.Charging);
 
+            battery = HidppProvider.ParseUnifiedBattery(
+                new byte[] { 0, 8, 3, 0 });
+            Check(sb, ref failures, "0x1004 approximate full",
+                battery != null && battery.Percent == 90 &&
+                battery.Approximate && battery.Charging);
+
             battery = HidppProvider.ParseBatteryVoltage(
-                new byte[] { 0x0E, 0x74, 0x00 });
-            Check(sb, ref failures, "0x1000 voltage",
-                battery != null && battery.Approximate &&
+                new byte[] { 0x0E, 0x74, 0x80 });
+            Check(sb, ref failures, "0x1001 voltage charging",
+                battery != null && battery.Approximate && battery.Charging &&
                 battery.Percent >= 40 && battery.Percent <= 50);
 
             Check(sb, ref failures, "voltage 4200",
@@ -229,6 +241,28 @@ namespace GearBatt
                 TextUtil.IsGenericDeviceName("HID-compliant mouse"));
             Check(sb, ref failures, "real device name",
                 !TextUtil.IsGenericDeviceName("LM129 BT"));
+
+            int atkPercent;
+            Check(sb, ref failures, "ATK response parser",
+                AtkVxeProvider.TryParseResponse(
+                    new byte[] { 0x08, 0x72, 0, 0, 0, 0x07, 0, 87 },
+                    out atkPercent) && atkPercent == 87);
+
+            byte[] darkrimQuery = DarkrimProtocol.BuildBatteryQuery();
+            Check(sb, ref failures, "DARKRIM query CRC",
+                darkrimQuery.Length == 65 &&
+                darkrimQuery[12] == 0x58 && darkrimQuery[13] == 0x09);
+
+            byte[] darkrimResponse = DarkrimProtocol.BuildFrame(
+                0, new byte[] { 0x01, 0x01, 0x46 }, 0x11, 0x02, 0, 0);
+            int darkrimPercent;
+            byte darkrimSeq;
+            List<DarkrimTlv> darkrimTlvs;
+            Check(sb, ref failures, "DARKRIM TLV battery",
+                DarkrimProtocol.TryGetBattery(
+                    darkrimResponse, out darkrimPercent,
+                    out darkrimSeq, out darkrimTlvs) &&
+                darkrimPercent == 70);
 
             using (Bitmap bitmap = IconRenderer.RenderBitmap(16, 90, false, false))
             {

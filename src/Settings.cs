@@ -14,6 +14,8 @@ namespace GearBatt
 
         private const string RunKeyPath =
             @"Software\Microsoft\Windows\CurrentVersion\Run";
+        private const string StartupApprovedPath =
+            @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
         private const string RunValueName = "Gear-Batt";
 
         public static string DirectoryPath
@@ -84,13 +86,26 @@ namespace GearBatt
         {
             try
             {
+                bool runExists = false;
                 using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RunKeyPath, false))
                 {
-                    if (key == null)
-                        return false;
-                    object value = key.GetValue(RunValueName);
-                    return value != null;
+                    if (key != null)
+                        runExists = key.GetValue(RunValueName) != null;
                 }
+                if (!runExists)
+                    return false;
+
+                using (RegistryKey approved = Registry.CurrentUser.OpenSubKey(
+                           StartupApprovedPath, false))
+                {
+                    if (approved != null)
+                    {
+                        byte[] state = approved.GetValue(RunValueName) as byte[];
+                        if (state != null && state.Length > 0 && state[0] == 0x03)
+                            return false;
+                    }
+                }
+                return true;
             }
             catch (Exception)
             {
@@ -119,6 +134,25 @@ namespace GearBatt
                     else
                     {
                         key.DeleteValue(RunValueName, false);
+                    }
+                }
+
+                using (RegistryKey approved = Registry.CurrentUser.CreateSubKey(
+                           StartupApprovedPath))
+                {
+                    if (approved != null)
+                    {
+                        if (enabled)
+                        {
+                            byte[] state = new byte[12];
+                            state[0] = 0x02;
+                            approved.SetValue(
+                                RunValueName, state, RegistryValueKind.Binary);
+                        }
+                        else
+                        {
+                            approved.DeleteValue(RunValueName, false);
+                        }
                     }
                 }
                 return true;

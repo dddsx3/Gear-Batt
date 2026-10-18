@@ -19,6 +19,8 @@ namespace GearBatt
         public bool IsError;
         public byte ErrorCode;
         public byte[] Parameters = new byte[0];
+        public byte[] RawRequest = new byte[0];
+        public byte[] RawResponse = new byte[0];
     }
 
     internal sealed class HidppDeviceRef
@@ -35,7 +37,7 @@ namespace GearBatt
 
     internal sealed class HidppConnection : IDisposable
     {
-        private const byte SoftwareId = 0x0A;
+        private byte _softwareId = 0x08;
 
         private IntPtr _handle = new IntPtr(-1);
         private IntPtr _event = IntPtr.Zero;
@@ -51,6 +53,16 @@ namespace GearBatt
         public bool IsOpen
         {
             get { return _handle != new IntPtr(-1); }
+        }
+
+        public int InputReportLength
+        {
+            get { return _inputLength; }
+        }
+
+        public int OutputReportLength
+        {
+            get { return _outputLength; }
         }
 
         public static HidppConnection Open(string path)
@@ -95,7 +107,7 @@ namespace GearBatt
                 }
                 caps = Marshal.AllocHGlobal(256);
                 int status = Native.HidP_GetCaps(preparsed, caps);
-                if (status != 0)
+                if (status != Native.HIDP_STATUS_SUCCESS)
                 {
                     connection.Dispose();
                     return null;
@@ -127,16 +139,46 @@ namespace GearBatt
             if (!IsOpen)
                 return null;
 
-            bool useLong = _outputLength >= 20;
+            bool primaryLong = _outputLength >= 20;
+            int firstTimeout = Math.Max(80, timeoutMs * 2 / 3);
+            int secondTimeout = Math.Max(60, timeoutMs - firstTimeout);
+
+            HidppResponse response = RequestOnce(
+                deviceIndex, featureIndex, function, parameters,
+                primaryLong, firstTimeout);
+            if (response != null)
+                return response;
+
+            if (_outputLength >= 20)
+            {
+                // A few receivers answer only the short report form.
+                response = RequestOnce(
+                    deviceIndex, featureIndex, function, parameters,
+                    false, secondTimeout);
+            }
+            return response;
+        }
+
+        private HidppResponse RequestOnce(
+            byte deviceIndex, byte featureIndex, byte function,
+            byte[] parameters, bool useLong, int timeoutMs)
+        {
+            _softwareId++;
+            if (_softwareId < 0x08 || _softwareId > 0x0F)
+                _softwareId = 0x08;
+            byte softwareId = _softwareId;
+
             int length = useLong ? 20 : 7;
             if (_outputLength < length)
                 length = _outputLength;
+            if (length < 4)
+                return null;
 
             byte[] report = new byte[length];
             report[0] = useLong ? (byte)0x11 : (byte)0x10;
             report[1] = deviceIndex;
             report[2] = featureIndex;
-            report[3] = (byte)(function | (SoftwareId << 4));
+            report[3] = (byte)(((function & 0x0F) << 4) | softwareId);
             if (parameters != null && parameters.Length > 0)
             {
                 int copy = Math.Min(parameters.Length, length - 4);
@@ -165,17 +207,22 @@ namespace GearBatt
                 byte responseDevice = buffer[1];
                 byte responseFeature = buffer[2];
                 byte functionAndSoftware = buffer[3];
-                byte software = (byte)(functionAndSoftware >> 4);
-                byte responseFunction = (byte)(functionAndSoftware & 0x0F);
+                byte software = (byte)(functionAndSoftware & 0x0F);
+                byte responseFunction = (byte)((functionAndSoftware >> 4) & 0x0F);
 
-                if (responseDevice != deviceIndex || software != SoftwareId)
+                if (responseDevice != deviceIndex || software != softwareId)
                     continue;
+
+                byte[] rawResponse = new byte[read];
+                Array.Copy(buffer, 0, rawResponse, 0, read);
 
                 if (responseFeature == 0xFF)
                 {
                     HidppResponse error = new HidppResponse();
                     error.IsError = true;
                     error.ErrorCode = read > 4 ? buffer[4] : (byte)0;
+                    error.RawRequest = report;
+                    error.RawResponse = rawResponse;
                     return error;
                 }
 
@@ -189,8 +236,20 @@ namespace GearBatt
                     parameterLength = 0;
                 response.Parameters = new byte[parameterLength];
                 Array.Copy(buffer, 4, response.Parameters, 0, parameterLength);
+                response.RawRequest = report;
+                response.RawResponse = rawResponse;
                 return response;
             }
+        }
+
+        public bool WriteRaw(byte[] report, int timeoutMs)
+        {
+            return WriteReport(report, timeoutMs);
+        }
+
+        public int ReadRaw(byte[] buffer, int timeoutMs)
+        {
+            return ReadReport(buffer, timeoutMs);
         }
 
         private bool WriteReport(byte[] report, int timeoutMs)
@@ -467,8 +526,8 @@ namespace GearBatt
             string receiverKey, string receiverName, string transport,
             List<string> log, bool verbose)
         {
-            byte featureIndex = GetFeature(connection, deviceIndex, 0x1001, 220);
-            ushort featureId = 0x1001;
+            byte featureIndex = GetFeature(connection, deviceIndex, 0x1000, 220);
+            ushort featureId = 0x1000;
             if (featureIndex == 0)
             {
                 featureIndex = GetFeature(connection, deviceIndex, 0x1004, 220);
@@ -476,8 +535,8 @@ namespace GearBatt
             }
             if (featureIndex == 0)
             {
-                featureIndex = GetFeature(connection, deviceIndex, 0x1000, 220);
-                featureId = 0x1000;
+                featureIndex = GetFeature(connection, deviceIndex, 0x1001, 220);
+                featureId = 0x1001;
             }
             if (featureIndex == 0)
             {
@@ -538,31 +597,32 @@ namespace GearBatt
             if (response == null || response.IsError)
                 return null;
 
-            if (reference.FeatureId == 0x1001)
-                return ParseBatteryLevelStatus(response.Parameters);
+            if (reference.FeatureId == 0x1000)
+                return ParseBatteryStatus(response.Parameters);
             if (reference.FeatureId == 0x1004)
                 return ParseUnifiedBattery(response.Parameters);
-            if (reference.FeatureId == 0x1000)
+            if (reference.FeatureId == 0x1001)
                 return ParseBatteryVoltage(response.Parameters);
             return null;
         }
 
-        internal static HidppBattery ParseBatteryLevelStatus(byte[] p)
+        internal static HidppBattery ParseBatteryStatus(byte[] p)
         {
-            if (p == null || p.Length < 1)
+            if (p == null || p.Length < 3)
                 return null;
             HidppBattery battery = new HidppBattery();
-            battery.Percent = Math.Max(0, Math.Min(100, (int)p[0]));
-            byte status = p.Length > 1 ? p[1] : (byte)0;
-            byte external = p.Length > 2 ? p[2] : (byte)0;
+            int level = p[0];
+            byte status = p[2];
             battery.Charging = status == 1 || status == 2 ||
                 status == 3 || status == 4;
-            if (status == 5 && external != 0)
-                battery.Charging = true;
+            if (level == 0)
+                battery.Percent = -1;
+            else
+                battery.Percent = Math.Min(100, level);
             battery.Detail = string.Format(
                 CultureInfo.InvariantCulture,
-                "0x1001 level={0} status={1} external={2}",
-                p[0], status, external);
+                "0x1000 level={0} next={1} status={2}",
+                p[0], p[1], status);
             return battery;
         }
 
@@ -571,16 +631,32 @@ namespace GearBatt
             if (p == null || p.Length < 1)
                 return null;
             HidppBattery battery = new HidppBattery();
-            battery.Percent = Math.Max(0, Math.Min(100, (int)p[0]));
+            int discharge = p[0];
             byte level = p.Length > 1 ? p[1] : (byte)0;
-            byte chargeType = p.Length > 2 ? p[2] : (byte)0;
-            byte chargeStatus = p.Length > 3 ? p[3] : (byte)0;
-            battery.Charging = chargeType != 0 ||
-                (chargeStatus >= 1 && chargeStatus <= 4);
+            byte status = p.Length > 2 ? p[2] : (byte)0;
+            byte ignored = p.Length > 3 ? p[3] : (byte)0;
+            battery.Charging = status >= 1 && status <= 4;
+            if (discharge > 0 && discharge <= 100)
+            {
+                battery.Percent = discharge;
+            }
+            else
+            {
+                battery.Approximate = true;
+                switch (level)
+                {
+                    case 8: battery.Percent = 90; break;
+                    case 4: battery.Percent = 50; break;
+                    case 2: battery.Percent = 20; break;
+                    case 1: battery.Percent = 5; break;
+                    case 0: battery.Percent = 0; break;
+                    default: battery.Percent = -1; break;
+                }
+            }
             battery.Detail = string.Format(
                 CultureInfo.InvariantCulture,
-                "0x1004 level={0} batteryLevel={1} chargeType={2} chargeStatus={3}",
-                p[0], level, chargeType, chargeStatus);
+                "0x1004 discharge={0} level={1} status={2} ignored={3}",
+                p[0], level, status, ignored);
             return battery;
         }
 
@@ -595,12 +671,13 @@ namespace GearBatt
             if (millivolts < 500 || millivolts > 6000)
                 millivolts = littleEndian;
             byte flags = p.Length > 2 ? p[2] : (byte)0;
-            battery.Charging = (flags & 0x02) != 0;
+            battery.Charging = (flags & 0x80) != 0 ||
+                (flags & 0x03) == 0x01;
             battery.Approximate = true;
             battery.Percent = VoltageToPercent(millivolts);
             battery.Detail = string.Format(
                 CultureInfo.InvariantCulture,
-                "0x1000 voltage={0}mV flags=0x{1:X2}", millivolts, flags);
+                "0x1001 voltage={0}mV flags=0x{1:X2}", millivolts, flags);
             return battery;
         }
 

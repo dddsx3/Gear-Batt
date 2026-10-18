@@ -304,76 +304,125 @@ namespace GearBatt
     {
         public void Scan(ScanResult result, List<string> log)
         {
+            HashSet<string> seen = new HashSet<string>(
+                StringComparer.OrdinalIgnoreCase);
+
             Guid guid = Native.GUID_DEVCLASS_BLUETOOTH;
             IntPtr set = Native.SetupDiGetClassDevsW(
                 ref guid, IntPtr.Zero, IntPtr.Zero, Native.DIGCF_PRESENT);
             if (set == new IntPtr(-1))
             {
-                result.AddError("蓝牙设备枚举失败，错误码 " + Marshal.GetLastWin32Error());
-                return;
+                result.AddError("蓝牙设备枚举失败，错误码 " +
+                    Marshal.GetLastWin32Error());
             }
-
-            try
+            else
             {
-                for (uint index = 0; ; index++)
+                try
                 {
-                    Native.SP_DEVINFO_DATA did = new Native.SP_DEVINFO_DATA();
-                    did.cbSize = (uint)Marshal.SizeOf(typeof(Native.SP_DEVINFO_DATA));
-                    if (!Native.SetupDiEnumDeviceInfo(set, index, ref did))
-                        break;
-
-                    byte percent;
-                    if (!Native.TryReadByteProperty(
-                            set, ref did, Native.DEVPKEY_Bluetooth_Battery, out percent))
-                        continue;
-
-                    bool charging;
-                    Native.TryReadBoolProperty(
-                        set, ref did, Native.DEVPKEY_Bluetooth_BatteryCharging, out charging);
-
-                    string[] categories = Native.ReadStringListProperty(
-                        set, ref did, Native.DEVPKEY_DeviceContainer_Category);
-                    if (!TextUtil.LooksLikePeripheralCategory(categories))
-                    {
-                        if (log != null)
-                            log.Add("bluetooth: skipped non-peripheral category");
-                        continue;
-                    }
-
-                    string name = Native.GetFriendlyName(set, ref did);
-                    if (string.IsNullOrEmpty(name))
-                        name = "蓝牙设备";
-                    string instanceId = Native.GetDeviceInstanceId(set, ref did);
-                    if (string.IsNullOrEmpty(instanceId))
-                        instanceId = name;
-
-                    WirelessDevice device = new WirelessDevice();
-                    device.Id = "bt:" + instanceId;
-                    device.Name = TextUtil.Clean(name);
-                    device.Percent = Math.Max(0, Math.Min(100, (int)percent));
-                    device.Charging = charging;
-                    device.Source = "蓝牙";
-                    device.Provider = "蓝牙";
-                    device.InstanceId = instanceId;
-                    device.SortOrder = 30;
-                    result.Devices.Add(device);
-
-                    if (log != null)
-                        log.Add("bluetooth: " + name + " percent=" + percent +
-                            " charging=" + charging +
-                            " categories=" + string.Join(",", categories));
+                    ScanSet(set, result, log, seen);
+                }
+                finally
+                {
+                    Native.SetupDiDestroyDeviceInfoList(set);
                 }
             }
-            finally
+
+            // Some Hands-Free/AG Audio battery nodes are not in the Bluetooth
+            // device class. A second all-classes pass catches those.
+            IntPtr all = Native.SetupDiGetClassDevsW(
+                IntPtr.Zero, IntPtr.Zero, IntPtr.Zero,
+                Native.DIGCF_PRESENT | Native.DIGCF_ALLCLASSES);
+            if (all != new IntPtr(-1))
             {
-                Native.SetupDiDestroyDeviceInfoList(set);
+                try
+                {
+                    ScanSet(all, result, log, seen);
+                }
+                finally
+                {
+                    Native.SetupDiDestroyDeviceInfoList(all);
+                }
             }
+        }
+
+        private static void ScanSet(
+            IntPtr set, ScanResult result, List<string> log,
+            HashSet<string> seen)
+        {
+            for (uint index = 0; ; index++)
+            {
+                Native.SP_DEVINFO_DATA did = new Native.SP_DEVINFO_DATA();
+                did.cbSize = (uint)Marshal.SizeOf(typeof(Native.SP_DEVINFO_DATA));
+                if (!Native.SetupDiEnumDeviceInfo(set, index, ref did))
+                    break;
+
+                string instanceId = Native.GetDeviceInstanceId(set, ref did);
+                if (string.IsNullOrEmpty(instanceId))
+                    continue;
+                string upper = instanceId.ToUpperInvariant();
+                if (!upper.StartsWith("BTHENUM") &&
+                    !upper.StartsWith("BTHLE") &&
+                    !upper.StartsWith("BTH\\"))
+                    continue;
+                if (seen.Contains(instanceId))
+                    continue;
+
+                byte percent;
+                if (!Native.TryReadByteProperty(
+                        set, ref did, Native.DEVPKEY_Bluetooth_Battery, out percent))
+                    continue;
+
+                bool charging;
+                Native.TryReadBoolProperty(
+                    set, ref did, Native.DEVPKEY_Bluetooth_BatteryCharging, out charging);
+
+                string[] categories = Native.ReadStringListProperty(
+                    set, ref did, Native.DEVPKEY_DeviceContainer_Category);
+                if (!TextUtil.LooksLikePeripheralCategory(categories))
+                    continue;
+
+                string name = Native.GetFriendlyName(set, ref did);
+                if (string.IsNullOrEmpty(name))
+                    name = "蓝牙设备";
+                name = TextUtil.Clean(name);
+
+                int level = percent == 0 ? -1 : Math.Min(100, (int)percent);
+                WirelessDevice device = new WirelessDevice();
+                device.Id = "bt:" + instanceId;
+                device.Name = name;
+                device.Percent = level;
+                device.Charging = charging;
+                device.Source = "蓝牙";
+                device.Provider = "蓝牙";
+                device.InstanceId = instanceId;
+                device.SortOrder = IsHandsFree(name) ? 25 : 30;
+                result.Devices.Add(device);
+                seen.Add(instanceId);
+
+                if (log != null)
+                    log.Add("bluetooth: " + name + " percent=" + percent +
+                        (level < 0 ? " (unknown/not connected)" : "") +
+                        " charging=" + charging +
+                        " categories=" + string.Join(",", categories));
+            }
+        }
+
+        private static bool IsHandsFree(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return false;
+            string lower = name.ToLowerInvariant();
+            return lower.Contains("hands-free") ||
+                lower.Contains("ag audio") ||
+                name.Contains("免提");
         }
     }
 
     internal sealed class Scanner
     {
         private readonly HidppProvider _hidpp = new HidppProvider();
+        private readonly AtkVxeProvider _atk = new AtkVxeProvider();
+        private readonly DarkrimProvider _darkrim = new DarkrimProvider();
 
         public ScanResult Scan(bool mock, bool verbose)
         {
@@ -410,6 +459,24 @@ namespace GearBatt
                 catch (Exception ex)
                 {
                     result.AddError("蓝牙属性: " + ex.Message);
+                }
+
+                try
+                {
+                    _atk.Scan(result, log);
+                }
+                catch (Exception ex)
+                {
+                    result.AddError("ATK/VXE: " + ex.Message);
+                }
+
+                try
+                {
+                    _darkrim.Scan(result, log);
+                }
+                catch (Exception ex)
+                {
+                    result.AddError("DARKRIM: " + ex.Message);
                 }
 
                 try
@@ -470,6 +537,14 @@ namespace GearBatt
             {
                 return d.Provider == "HID++";
             });
+            bool hasAtk = sorted.Exists(delegate(WirelessDevice d)
+            {
+                return d.Provider == "ATK/VXE";
+            });
+            bool hasDarkrim = sorted.Exists(delegate(WirelessDevice d)
+            {
+                return d.Provider == "DARKRIM";
+            });
 
             List<WirelessDevice> output = new List<WirelessDevice>();
             for (int i = 0; i < sorted.Count; i++)
@@ -478,6 +553,12 @@ namespace GearBatt
 
                 if (hasHidpp && d.Provider == "Windows" &&
                     TextUtil.IsLikelyLogitechPath(d.InstanceId))
+                    continue;
+                if (hasAtk && d.Provider == "Windows" &&
+                    PathHasVid(d.InstanceId, "VID_373B"))
+                    continue;
+                if (hasDarkrim && d.Provider == "Windows" &&
+                    PathHasVid(d.InstanceId, "VID_3654"))
                     continue;
 
                 if (d.Provider == "Windows" && d.Source == "蓝牙")
@@ -516,13 +597,20 @@ namespace GearBatt
 
         private static int Priority(WirelessDevice d)
         {
-            if (d.Provider == "HID++")
+            if (d.Provider == "HID++" || d.Provider == "ATK/VXE" ||
+                d.Provider == "DARKRIM")
                 return 0;
             if (d.Provider == "蓝牙")
                 return 1;
             if (d.Provider == "Windows")
                 return 2;
             return 3;
+        }
+
+        private static bool PathHasVid(string path, string vid)
+        {
+            return !string.IsNullOrEmpty(path) &&
+                path.IndexOf(vid, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static bool NamesSimilar(string a, string b)

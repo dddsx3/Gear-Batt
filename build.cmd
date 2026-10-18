@@ -24,6 +24,8 @@ if not exist dist mkdir dist
     src\Models.cs ^
     src\Providers.cs ^
     src\Hidpp.cs ^
+    src\HidDevices.cs ^
+    src\VendorProtocols.cs ^
     src\IconRenderer.cs ^
     src\Settings.cs ^
     src\TrayApp.cs ^
@@ -31,4 +33,26 @@ if not exist dist mkdir dist
 
 if errorlevel 1 exit /b 1
 echo Built dist\Gear-Batt.exe
+
+"%CSC%" -nologo -target:winexe -platform:anycpu -optimize+ ^
+    -out:dist\Gear-Batt-Collector.exe ^
+    -win32icon:app.ico ^
+    -win32manifest:collector.manifest ^
+    -r:System.dll ^
+    -r:System.Core.dll ^
+    -r:System.Drawing.dll ^
+    -r:System.Windows.Forms.dll ^
+    src\Native.cs ^
+    src\Models.cs ^
+    src\Providers.cs ^
+    src\Hidpp.cs ^
+    src\HidDevices.cs ^
+    src\VendorProtocols.cs ^
+    collector\CollectorAssemblyInfo.cs ^
+    collector\CollectorProgram.cs ^
+    collector\CollectorForm.cs ^
+    collector\CollectorEngine.cs
+
+if errorlevel 1 exit /b 1
+echo Built dist\Gear-Batt-Collector.exe
 endlocal

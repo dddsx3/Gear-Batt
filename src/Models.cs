@@ -97,6 +97,23 @@ namespace GearBatt
             return text.Substring(0, max - 1) + "…";
         }
 
+        public static string Hex(byte[] data, int max)
+        {
+            if (data == null || data.Length == 0)
+                return "";
+            int count = Math.Min(data.Length, max);
+            StringBuilder sb = new StringBuilder(count * 3);
+            for (int i = 0; i < count; i++)
+            {
+                if (i > 0)
+                    sb.Append(' ');
+                sb.Append(data[i].ToString("X2"));
+            }
+            if (data.Length > max)
+                sb.Append(" ...");
+            return sb.ToString();
+        }
+
         public static string Clean(string text)
         {
             if (string.IsNullOrEmpty(text))

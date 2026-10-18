@@ -8,6 +8,7 @@ namespace GearBatt
     {
         public const int DIGCF_PRESENT = 0x02;
         public const int DIGCF_DEVICEINTERFACE = 0x10;
+        public const int DIGCF_ALLCLASSES = 0x04;
         public const int ERROR_INSUFFICIENT_BUFFER = 122;
         public const int ERROR_NO_MORE_ITEMS = 259;
         public const int ERROR_IO_PENDING = 997;
@@ -24,6 +25,7 @@ namespace GearBatt
         public const uint WAIT_TIMEOUT = 258;
         public const uint INFINITE = 0xFFFFFFFF;
 
+        public const uint IOCTL_HID_GET_REPORT_DESCRIPTOR = 0x000B0007;
         public const uint IOCTL_BATTERY_QUERY_TAG = 0x294040;
         public const uint IOCTL_BATTERY_QUERY_INFORMATION = 0x294044;
         public const uint IOCTL_BATTERY_QUERY_STATUS = 0x29404C;
@@ -40,6 +42,7 @@ namespace GearBatt
         public const int SM_CYSMICON = 50;
         public const uint ATTACH_PARENT_PROCESS = 0xFFFFFFFF;
         public const uint CM_LOCATE_DEVNODE_NORMAL = 0;
+        public const int HIDP_STATUS_SUCCESS = 0x00110000;
 
         public const uint SPDRP_DEVICEDESC = 0x00000000;
         public const uint SPDRP_FRIENDLYNAME = 0x0000000C;
@@ -161,6 +164,42 @@ namespace GearBatt
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        public struct HIDP_VALUE_CAPS
+        {
+            public ushort UsagePage;
+            public byte ReportID;
+            [MarshalAs(UnmanagedType.U1)] public bool IsAlias;
+            public ushort BitField;
+            public ushort LinkCollection;
+            public ushort LinkUsage;
+            public ushort LinkUsagePage;
+            [MarshalAs(UnmanagedType.U1)] public bool IsRange;
+            [MarshalAs(UnmanagedType.U1)] public bool IsStringRange;
+            [MarshalAs(UnmanagedType.U1)] public bool IsDesignatorRange;
+            [MarshalAs(UnmanagedType.U1)] public bool IsAbsolute;
+            [MarshalAs(UnmanagedType.U1)] public bool HasNull;
+            public byte Reserved;
+            public ushort BitSize;
+            public ushort ReportCount;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 5)]
+            public ushort[] Reserved2;
+            public uint UnitsExp;
+            public uint Units;
+            public int LogicalMin;
+            public int LogicalMax;
+            public int PhysicalMin;
+            public int PhysicalMax;
+            public ushort UsageMin;
+            public ushort UsageMax;
+            public ushort StringMin;
+            public ushort StringMax;
+            public ushort DesignatorMin;
+            public ushort DesignatorMax;
+            public ushort DataIndexMin;
+            public ushort DataIndexMax;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         public struct OVERLAPPED
         {
             public IntPtr Internal;
@@ -173,6 +212,10 @@ namespace GearBatt
         [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern IntPtr SetupDiGetClassDevsW(
             ref Guid ClassGuid, IntPtr Enumerator, IntPtr hwndParent, uint Flags);
+
+        [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern IntPtr SetupDiGetClassDevsW(
+            IntPtr ClassGuid, IntPtr Enumerator, IntPtr hwndParent, uint Flags);
 
         [DllImport("setupapi.dll", SetLastError = true)]
         public static extern bool SetupDiDestroyDeviceInfoList(IntPtr DeviceInfoSet);
@@ -255,6 +298,13 @@ namespace GearBatt
             out BATTERY_STATUS lpOutBuffer, int nOutBufferSize,
             out int lpBytesReturned, IntPtr lpOverlapped);
 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool DeviceIoControl(
+            IntPtr hDevice, uint dwIoControlCode,
+            IntPtr lpInBuffer, int nInBufferSize,
+            byte[] lpOutBuffer, int nOutBufferSize,
+            out int lpBytesReturned, IntPtr lpOverlapped);
+
         [DllImport("hid.dll", SetLastError = true)]
         public static extern bool HidD_GetAttributes(
             IntPtr HidDeviceObject, ref HIDD_ATTRIBUTES Attributes);
@@ -268,6 +318,20 @@ namespace GearBatt
 
         [DllImport("hid.dll", SetLastError = true)]
         public static extern int HidP_GetCaps(IntPtr PreparsedData, IntPtr Capabilities);
+
+        [DllImport("hid.dll")]
+        public static extern int HidP_GetValueCaps(
+            int ReportType, IntPtr ValueCaps, ref ushort ValueCapsLength,
+            IntPtr PreparsedData);
+
+        [DllImport("hid.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern bool HidD_GetProductString(
+            IntPtr HidDeviceObject, byte[] Buffer, int BufferLength);
+
+        [DllImport("hid.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern bool HidD_GetManufacturerString(
+            IntPtr HidDeviceObject, byte[] Buffer, int BufferLength);
+
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern IntPtr CreateEventW(
@@ -456,7 +520,9 @@ namespace GearBatt
                 if (!SetupDiGetDeviceInterfaceDetailW(
                         deviceInfoSet, ref interfaceData, detail, required, out required, ref deviceInfoData))
                     return null;
-                int pathOffset = IntPtr.Size == 8 ? 8 : 4;
+                // DevicePath follows the DWORD cbSize directly. The documented
+                // x64 cbSize is 8, but the string itself starts at offset 4.
+                const int pathOffset = 4;
                 return Marshal.PtrToStringUni(IntPtr.Add(detail, pathOffset));
             }
             finally
