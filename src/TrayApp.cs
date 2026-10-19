@@ -26,6 +26,8 @@ namespace GearBatt
         private bool _disposed;
         private Icon _currentIcon;
         private DateTime _lastUpdated = DateTime.MinValue;
+        private LowBatteryPopup _lowBatteryPopup;
+        private string _lowBatteryAlertedDeviceId = "";
 
         public TrayApp(bool mock)
         {
@@ -139,6 +141,7 @@ namespace GearBatt
 
             UpdateTray();
             RebuildMenu();
+            CheckLowBattery(selected);
         }
 
         private void UpdateTray()
@@ -341,10 +344,53 @@ namespace GearBatt
             _settings.SelectedName = device.Name;
             _settings.Save();
             UpdateTray();
+            CheckLowBattery(device);
 
             _menuNeedsRebuild = true;
             if (!_menu.Visible)
                 RebuildMenu();
+        }
+
+        private void CheckLowBattery(WirelessDevice device)
+        {
+            if (_disposed)
+                return;
+            if (device == null)
+            {
+                _lowBatteryAlertedDeviceId = "";
+                return;
+            }
+
+            bool low = device.Percent >= 0 &&
+                device.Percent < 5 && !device.Charging;
+            if (!low)
+            {
+                _lowBatteryAlertedDeviceId = "";
+                return;
+            }
+            if (_lowBatteryAlertedDeviceId == device.Id)
+                return;
+
+            _lowBatteryAlertedDeviceId = device.Id;
+            ShowLowBatteryPopup(device);
+        }
+
+        private void ShowLowBatteryPopup(WirelessDevice device)
+        {
+            if (_lowBatteryPopup != null && !_lowBatteryPopup.IsDisposed)
+            {
+                _lowBatteryPopup.Close();
+                _lowBatteryPopup = null;
+            }
+
+            LowBatteryPopup popup = new LowBatteryPopup(device);
+            _lowBatteryPopup = popup;
+            popup.FormClosed += delegate
+            {
+                if (ReferenceEquals(_lowBatteryPopup, popup))
+                    _lowBatteryPopup = null;
+            };
+            popup.Show();
         }
 
         private void ToggleAutostart()
@@ -363,7 +409,7 @@ namespace GearBatt
         private void ShowAbout()
         {
             string text =
-                "Gear-Batt 1.1\n\n" +
+                "Gear-Batt 1.2\n\n" +
                 "显示所选无线设备的电量与充电状态。\n\n" +
                 "支持来源：\n" +
                 "• Windows 电池接口（部分 2.4G 接收器）\n" +
@@ -371,6 +417,9 @@ namespace GearBatt
                 "• ATK/VXE 373B:1216（只读查询）\n" +
                 "• DARKRIM 3654:6901（只读查询）\n" +
                 "• Windows 蓝牙设备电量属性\n\n" +
+                "低电量提醒：当前显示的设备未充电且电量低于 5% 时，\n" +
+                "会静默弹出一个提示卡片（不播放声音、不抢焦点、10 秒自动关闭）。\n" +
+                "同一轮低电量只提醒一次；电量回升或开始充电后重置。\n\n" +
                 "设备本身必须上报电量。使用私有协议且不向系统上报电量的设备无法读取；\n" +
                 "可以运行“帮助适配我的设备…”采集本机数据，帮助后续适配。\n\n" +
                 "左键单击托盘图标可选择要显示的设备；悬停可查看精确电量。";
@@ -479,6 +528,18 @@ namespace GearBatt
             {
                 _currentIcon.Dispose();
                 _currentIcon = null;
+            }
+
+            if (_lowBatteryPopup != null)
+            {
+                try
+                {
+                    _lowBatteryPopup.Close();
+                }
+                catch (Exception)
+                {
+                }
+                _lowBatteryPopup = null;
             }
 
             try

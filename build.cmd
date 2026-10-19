@@ -27,6 +27,7 @@ if not exist dist mkdir dist
     src\HidDevices.cs ^
     src\VendorProtocols.cs ^
     src\IconRenderer.cs ^
+    src\LowBatteryPopup.cs ^
     src\Settings.cs ^
     src\TrayApp.cs ^
     src\Program.cs

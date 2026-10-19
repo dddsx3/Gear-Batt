@@ -438,7 +438,7 @@ namespace GearBatt
                 result.Devices.Add(MockDevice(
                     "mock:lm129", "LM129 BT", 100, false, "蓝牙", "蓝牙模拟", 30));
                 result.Devices.Add(MockDevice(
-                    "mock:low", "低电量测试鼠标", 8, false, "2.4G", "模拟", 12));
+                    "mock:low", "低电量测试鼠标", 4, false, "2.4G", "模拟", 12));
                 result.AddNote("模拟模式：显示 4 个假设备。");
             }
             else
