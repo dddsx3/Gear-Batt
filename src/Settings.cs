@@ -122,7 +122,9 @@ namespace GearBatt
                 {
                     if (key == null)
                     {
-                        error = "无法打开开机启动注册表项。";
+                        error = L10n.T(
+                            "无法打开开机启动注册表项。",
+                            "Could not open the startup registry key.");
                         return false;
                     }
                     if (enabled)

@@ -361,6 +361,9 @@ namespace GearBatt
             IntPtr hFile, byte[] lpBuffer, int nNumberOfBytesToRead,
             out int lpNumberOfBytesRead, ref OVERLAPPED lpOverlapped);
 
+        [DllImport("kernel32.dll")]
+        public static extern ushort GetUserDefaultUILanguage();
+
         [DllImport("user32.dll")]
         public static extern int GetSystemMetrics(int nIndex);
 

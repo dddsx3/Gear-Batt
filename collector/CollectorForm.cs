@@ -31,7 +31,9 @@ namespace GearBatt
             if (_scale <= 0.5f || _scale > 4f)
                 _scale = 1f;
 
-            Text = "Gear-Batt 数据采集器（自愿参加）";
+            Text = L10n.T(
+                "Gear-Batt 数据采集器（自愿参加）",
+                "Gear-Batt Data Collector (Voluntary)");
             ClientSize = new Size(S(660), S(630));
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -41,7 +43,9 @@ namespace GearBatt
             Font = SystemFonts.MessageBoxFont;
 
             Label title = new Label();
-            title.Text = "Gear-Batt 兼容性数据采集器";
+            title.Text = L10n.T(
+                "Gear-Batt 兼容性数据采集器",
+                "Gear-Batt Compatibility Data Collector");
             title.Font = new Font(Font.FontFamily, 15f, FontStyle.Bold);
             Place(title, 20, 14, 620, 32);
             Controls.Add(title);
@@ -53,7 +57,7 @@ namespace GearBatt
             notice.BorderStyle = BorderStyle.FixedSingle;
             notice.BackColor = SystemColors.Control;
             notice.TabStop = false;
-            notice.Text =
+            notice.Text = L10n.T(
                 "这是完全自愿的兼容性改进工具，不是使用 Gear-Batt 的前提。\r\n\r\n" +
                 "它只读取设备的技术信息：VID/PID、HID 使用页/用途、解析后的 HID 字段信息、" +
                 "只读电量协议响应，以及 Windows/蓝牙电量值。\r\n\r\n" +
@@ -61,18 +65,35 @@ namespace GearBatt
                 "序列号或蓝牙地址；不会联网，也不会自动上传。\r\n\r\n" +
                 "报告中会包含设备名称/型号和 VID/PID；原始协议响应中也可能包含设备侧型号/ID。\r\n" +
                 "如果这些内容包含个人信息，请在分享前修改。\r\n\r\n" +
-                "报告只保存在本机。你可以先打开报告检查内容，再决定是否发送到 GitHub Issue。";
+                "报告只保存在本机。你可以先打开报告检查内容，再决定是否发送到 GitHub Issue。",
+                "This is a completely voluntary compatibility improvement tool. " +
+                "It is not required to use Gear-Batt.\r\n\r\n" +
+                "It only reads technical device information: VID/PID, HID usage page/usage, " +
+                "parsed HID field information, read-only battery protocol responses, and " +
+                "Windows/Bluetooth battery values.\r\n\r\n" +
+                "It does not read keystrokes, mouse movement, raw input reports, username, " +
+                "computer name, IP addresses, serial numbers, or Bluetooth addresses. " +
+                "It does not access the network or upload anything automatically.\r\n\r\n" +
+                "The report may contain device names/models and VID/PID; vendor protocol " +
+                "responses may also contain device-side model/ID bytes. Remove anything " +
+                "you do not want to share.\r\n\r\n" +
+                "The report is stored locally. You can open and review it before deciding " +
+                "whether to share it via a GitHub Issue.");
             Place(notice, 20, 52, 620, 160);
             Controls.Add(notice);
 
             _consent = new CheckBox();
-            _consent.Text = "我已阅读以上说明，并自愿提供这些技术数据。";
+            _consent.Text = L10n.T(
+                "我已阅读以上说明，并自愿提供这些技术数据。",
+                "I have read the notice and voluntarily provide this technical data.");
             Place(_consent, 20, 220, 620, 26);
             _consent.CheckedChanged += delegate { UpdateButtons(); };
             Controls.Add(_consent);
 
             Label modelLabel = new Label();
-            modelLabel.Text = "设备型号（可选，例如：罗技 G304）";
+            modelLabel.Text = L10n.T(
+                "设备型号（可选，例如：罗技 G304）",
+                "Model (optional, e.g. G304)");
             Place(modelLabel, 20, 254, 220, 24);
             Controls.Add(modelLabel);
 
@@ -82,13 +103,14 @@ namespace GearBatt
             Controls.Add(_model);
 
             _collect = new Button();
-            _collect.Text = "采集并保存报告";
+            _collect.Text = L10n.T(
+                "采集并保存报告", "Collect and save report");
             Place(_collect, 20, 288, 180, 34);
             _collect.Click += OnCollect;
             Controls.Add(_collect);
 
             _status = new Label();
-            _status.Text = "等待开始";
+            _status.Text = L10n.T("等待开始", "Ready");
             Place(_status, 215, 296, 425, 22);
             Controls.Add(_status);
 
@@ -99,41 +121,47 @@ namespace GearBatt
             _result.BorderStyle = BorderStyle.FixedSingle;
             _result.BackColor = SystemColors.Window;
             Place(_result, 20, 334, 620, 178);
-            _result.Text = "报告会生成在本机，不会自动上传。";
+            _result.Text = L10n.T(
+                "报告会生成在本机，不会自动上传。",
+                "The report is created locally and is never uploaded automatically.");
             Controls.Add(_result);
 
             _openReport = new Button();
-            _openReport.Text = "打开报告";
+            _openReport.Text = L10n.T("打开报告", "Open report");
             Place(_openReport, 20, 526, 130, 32);
             _openReport.Click += delegate { OpenReport(); };
             Controls.Add(_openReport);
 
             _openFolder = new Button();
-            _openFolder.Text = "打开所在文件夹";
+            _openFolder.Text = L10n.T("打开所在文件夹", "Open folder");
             Place(_openFolder, 160, 526, 130, 32);
             _openFolder.Click += delegate { OpenFolder(); };
             Controls.Add(_openFolder);
 
             _copyPath = new Button();
-            _copyPath.Text = "复制路径";
+            _copyPath.Text = L10n.T("复制路径", "Copy path");
             Place(_copyPath, 300, 526, 100, 32);
             _copyPath.Click += delegate { CopyPath(); };
             Controls.Add(_copyPath);
 
             _github = new Button();
-            _github.Text = "打开 GitHub Issue";
+            _github.Text = L10n.T("打开 GitHub Issue", "Open GitHub Issue");
             Place(_github, 410, 526, 150, 32);
             _github.Click += delegate { OpenIssuePage(); };
             Controls.Add(_github);
 
             _exit = new Button();
-            _exit.Text = "退出";
+            _exit.Text = L10n.T("退出", "Exit");
             Place(_exit, 570, 526, 70, 32);
             _exit.Click += delegate { Close(); };
             Controls.Add(_exit);
 
             Label footer = new Label();
-            footer.Text = "本程序不联网；只有你点击“打开 GitHub Issue”时才会启动浏览器。请手动附加报告。";
+            footer.AutoSize = false;
+            footer.Text = L10n.T(
+                "本程序不联网；只有你点击“打开 GitHub Issue”时才会启动浏览器。请手动附加报告。",
+                "This program does not access the network; only clicking “Open GitHub Issue” " +
+                "starts a browser. Attach the report manually.");
             footer.ForeColor = SystemColors.GrayText;
             Place(footer, 20, 570, 620, 42);
             Controls.Add(footer);
@@ -159,9 +187,11 @@ namespace GearBatt
             _busy = true;
             _consent.Enabled = false;
             _model.Enabled = false;
-            _status.Text = "正在采集…";
-            _result.Text = "正在扫描 HID 接口并执行只读电量查询，请稍候…\r\n" +
-                "这通常需要几秒钟。";
+            _status.Text = L10n.T("正在采集…", "Collecting…");
+            _result.Text = L10n.T(
+                "正在扫描 HID 接口并执行只读电量查询，请稍候…\r\n这通常需要几秒钟。",
+                "Scanning HID interfaces and sending read-only battery queries…\r\n" +
+                "This usually takes a few seconds.");
             UpdateButtons();
 
             string model = _model.Text.Trim();
@@ -199,26 +229,33 @@ namespace GearBatt
 
             if (failure != null)
             {
-                _status.Text = "采集失败";
-                _result.Text = "采集失败：\r\n" + failure.Message +
-                    "\r\n\r\n你可以重试；如果仍然失败，请在 GitHub Issue 中描述错误。";
+                _status.Text = L10n.T("采集失败", "Collection failed");
+                _result.Text = L10n.T(
+                    "采集失败：\r\n" + failure.Message +
+                    "\r\n\r\n你可以重试；如果仍然失败，请在 GitHub Issue 中描述错误。",
+                    "Collection failed:\r\n" + failure.Message +
+                    "\r\n\r\nYou can retry; if it still fails, describe the error in a GitHub Issue.");
                 UpdateButtons();
                 return;
             }
 
             if (result == null)
             {
-                _status.Text = "采集失败";
-                _result.Text = "采集失败：没有生成结果。";
+                _status.Text = L10n.T("采集失败", "Collection failed");
+                _result.Text = L10n.T(
+                    "采集失败：没有生成结果。",
+                    "Collection failed: no result was generated.");
                 UpdateButtons();
                 return;
             }
 
             _reportPath = result.ReportPath;
-            _status.Text = "采集完成";
+            _status.Text = L10n.T("采集完成", "Done");
             _result.Text = result.Summary +
-                "\r\n\r\n报告已保存到：\r\n" + _reportPath +
-                "\r\n\r\n请先打开报告检查内容，再决定是否分享。";
+                L10n.T("\r\n\r\n报告已保存到：\r\n",
+                    "\r\n\r\nReport saved to:\r\n") + _reportPath +
+                L10n.T("\r\n\r\n请先打开报告检查内容，再决定是否分享。",
+                    "\r\n\r\nOpen and review the report before deciding to share it.");
             UpdateButtons();
         }
 
@@ -244,8 +281,9 @@ namespace GearBatt
                 catch (Exception ex)
                 {
                     MessageBox.Show(
-                        "无法打开报告：\n" + ex.Message,
-                        "Gear-Batt 数据采集器",
+                        L10n.T("无法打开报告：\n" + ex.Message,
+                            "Could not open the report:\n" + ex.Message),
+                        L10n.T("Gear-Batt 数据采集器", "Gear-Batt Data Collector"),
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }
@@ -272,7 +310,8 @@ namespace GearBatt
             try
             {
                 Clipboard.SetText(_reportPath);
-                _status.Text = "报告路径已复制";
+                _status.Text = L10n.T(
+                    "报告路径已复制", "Report path copied");
             }
             catch (Exception)
             {
@@ -284,14 +323,19 @@ namespace GearBatt
             try
             {
                 Process.Start("https://github.com/dddsx3/Gear-Batt/issues/new");
-                _status.Text = "浏览器已打开；请手动附加报告";
+                _status.Text = L10n.T(
+                    "浏览器已打开；请手动附加报告",
+                    "Browser opened; attach the report manually");
             }
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    "无法打开浏览器：\n" + ex.Message +
-                    "\n\n请手动访问：\nhttps://github.com/dddsx3/Gear-Batt/issues/new",
-                    "Gear-Batt 数据采集器",
+                    L10n.T(
+                        "无法打开浏览器：\n" + ex.Message +
+                        "\n\n请手动访问：\nhttps://github.com/dddsx3/Gear-Batt/issues/new",
+                        "Could not open the browser:\n" + ex.Message +
+                        "\n\nPlease visit manually:\nhttps://github.com/dddsx3/Gear-Batt/issues/new"),
+                    L10n.T("Gear-Batt 数据采集器", "Gear-Batt Data Collector"),
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }

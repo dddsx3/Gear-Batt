@@ -1,4 +1,4 @@
-# Gear-Batt v1.3.0
+# Gear-Batt v1.3.1
 
 **中文** | [English](#english)
 
@@ -8,18 +8,16 @@ Gear-Batt 是一个 Windows 单文件托盘工具，用于显示所选无线外�
 
 ### 本版重点
 
-- **状态即时刷新**：设备接入/移除、系统电源状态变化会立即触发扫描；充电或电量 ≤10% 时每 5 秒快速检查，其余时间 60 秒。
-- **低电量提醒**：当前显示设备未充电且低于 5% 时静默弹出提示卡片；不播放声音、不抢焦点、**不会自动关闭**，需点击右上角 × 关闭；同一轮低电量只提醒一次。
-- **单设备显示**：检测到多个设备时，在菜单中指定当前显示哪一个；选择会被记住。
-- **单文件**：无需安装，使用 Windows 自带的 .NET Framework 4.8。
+- **界面跟随系统语言**：主程序和数据采集器启动时读取 Windows 显示语言；中文系统显示中文，其他语言显示英文。
+- **可强制指定语言**：`Gear-Batt.exe --lang zh|en`；采集器同样支持 `--lang zh|en`。
+- 主程序与采集器均已更新；采集报告仍是英文技术报告，界面文案跟随系统语言。
 
-### 支持的电量来源
+### 已有功能
 
-- Windows 电池接口（部分 2.4G 接收器）
-- 罗技 HID++ 2.0（Unifying / Bolt / Lightspeed）
-- ATK/VXE `373B:1216`（只读查询）
-- DARKRIM `3654:6901`（只读查询）
-- Windows 蓝牙设备电量属性
+- 状态即时刷新：设备接入/移除、系统电源状态变化立即触发扫描；充电或电量 ≤10% 时每 5 秒快速检查，其余 60 秒。
+- 低电量提醒：当前显示设备未充电且低于 5% 时静默弹出提示卡片；不播放声音、不抢焦点、**不会自动关闭**，需点击右上角 × 关闭；每轮只提醒一次。
+- 单设备显示：多设备时在菜单中指定要显示哪一个，并记住选择。
+- 支持 Windows 电池接口、罗技 HID++ 2.0、ATK/VXE 373B:1216、DARKRIM 3654:6901、Windows 蓝牙电量属性。
 
 ### 自愿提交设备协议数据
 
@@ -45,26 +43,22 @@ Windows 10 1903+ / Windows 11；系统自带 .NET Framework 4.8；无需安装�
 - [双语 README](https://github.com/dddsx3/Gear-Batt#readme)（[English](https://github.com/dddsx3/Gear-Batt/blob/main/README.en.md)）
 - [问题与适配请求](https://github.com/dddsx3/Gear-Batt/issues)
 
-> 应用界面当前为中文；README 与 Release 文案为双语。
-
 ## English
 
 Gear-Batt is a single-exe Windows tray utility that shows the battery level of the selected wireless peripheral (2.4 GHz receiver / Bluetooth). It shows a lightning bolt while charging, and a proportional battery fill with percentage on battery.
 
 ### Highlights
 
-- **Instant status refresh**: device attach/remove and system power-status changes trigger a scan immediately; while charging or at ≤10% it checks every 5 seconds, otherwise every 60 seconds.
-- **Low-battery alert**: when the selected device is discharging and below 5%, a silent card appears. It plays no sound, does not steal focus, and **does not auto-close**; click the × to dismiss. It is shown once per low-battery episode.
-- **One displayed device**: choose which device to show from the menu when several are detected; the selection is remembered.
-- **Single exe**: no installation; uses the built-in .NET Framework 4.8.
+- **UI follows the system language**: the main app and data collector read the Windows display language at startup; Chinese Windows shows Chinese, other languages show English.
+- **Language override**: `Gear-Batt.exe --lang zh|en`; the collector supports `--lang zh|en` as well.
+- Both the main app and collector are updated. The collector report remains an English technical report; the UI follows the system language.
 
-### Supported battery sources
+### Existing features
 
-- Windows battery interface (some 2.4 GHz receivers)
-- Logitech HID++ 2.0 (Unifying / Bolt / Lightspeed)
-- ATK/VXE `373B:1216` (read-only queries)
-- DARKRIM `3654:6901` (read-only queries)
-- Windows Bluetooth battery property
+- Instant status refresh: device attach/remove and system power-status changes trigger a scan immediately; while charging or at ≤10% it checks every 5 seconds, otherwise every 60 seconds.
+- Low-battery alert: when the selected device is discharging and below 5%, a silent card appears. It plays no sound, does not steal focus, and **does not auto-close**; click × to dismiss. It is shown once per low-battery episode.
+- One displayed device: choose which device to show from the menu when several are detected; the selection is remembered.
+- Supported sources: Windows battery interface, Logitech HID++ 2.0, ATK/VXE 373B:1216, DARKRIM 3654:6901, and the Windows Bluetooth battery property.
 
 ### Voluntary protocol data submission
 
@@ -89,5 +83,3 @@ Windows 10 1903+ / Windows 11 with the built-in .NET Framework 4.8; no installat
 
 - [Bilingual README](https://github.com/dddsx3/Gear-Batt#readme) ([中文](https://github.com/dddsx3/Gear-Batt/blob/main/README.md))
 - [Issues & adaptation requests](https://github.com/dddsx3/Gear-Batt/issues)
-
-> The application UI is currently in Chinese; the README and release notes are bilingual.

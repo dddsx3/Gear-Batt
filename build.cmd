@@ -21,6 +21,7 @@ if not exist dist mkdir dist
     -r:System.Windows.Forms.dll ^
     src\AssemblyInfo.cs ^
     src\Native.cs ^
+    src\L10n.cs ^
     src\Models.cs ^
     src\Providers.cs ^
     src\Hidpp.cs ^
@@ -45,6 +46,7 @@ echo Built dist\Gear-Batt.exe
     -r:System.Drawing.dll ^
     -r:System.Windows.Forms.dll ^
     src\Native.cs ^
+    src\L10n.cs ^
     src\Models.cs ^
     src\Providers.cs ^
     src\Hidpp.cs ^

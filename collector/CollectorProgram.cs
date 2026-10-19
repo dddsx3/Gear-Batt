@@ -9,6 +9,7 @@ namespace GearBatt
         private static void Main(string[] args)
         {
             Native.EnableDpiAwareness();
+            L10n.Initialize(GetArg(args, "--lang"));
 
             if (HasArg(args, "--collect"))
             {

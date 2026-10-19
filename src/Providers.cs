@@ -60,7 +60,7 @@ namespace GearBatt
 
             if (candidates.Count > 0)
                 return candidates[0];
-            return "无线设备";
+            return L10n.T("无线设备", "Wireless device");
         }
 
         private static void AddCandidate(List<string> list, string value)
@@ -142,7 +142,7 @@ namespace GearBatt
                     string name = DeviceNameResolver.Resolve(
                         instanceId, reading.DeviceName, friendly, bus, desc, log);
                     if (TextUtil.IsGenericDeviceName(name))
-                        name = "无线设备";
+                        name = L10n.T("无线设备", "Wireless device");
 
                     WirelessDevice device = new WirelessDevice();
                     device.Id = "win:" + (instanceId ?? path);
@@ -383,7 +383,7 @@ namespace GearBatt
 
                 string name = Native.GetFriendlyName(set, ref did);
                 if (string.IsNullOrEmpty(name))
-                    name = "蓝牙设备";
+                    name = L10n.T("蓝牙设备", "Bluetooth device");
                 name = TextUtil.Clean(name);
 
                 int level = percent == 0 ? -1 : Math.Min(100, (int)percent);
@@ -432,14 +432,20 @@ namespace GearBatt
             if (mock)
             {
                 result.Devices.Add(MockDevice(
-                    "mock:g304", "G304 无线鼠标", 87, true, "2.4G", "HID++ 模拟", 10));
+                    "mock:g304", L10n.T("G304 无线鼠标", "G304 Wireless Mouse"),
+                    87, true, "2.4G", "HID++ 模拟", 10));
                 result.Devices.Add(MockDevice(
-                    "mock:mxkeys", "MX Keys Mini", 42, false, "2.4G", "HID++ 模拟", 11));
+                    "mock:mxkeys", "MX Keys Mini", 42, false,
+                    "2.4G", "HID++ 模拟", 11));
                 result.Devices.Add(MockDevice(
-                    "mock:lm129", "LM129 BT", 100, false, "蓝牙", "蓝牙模拟", 30));
+                    "mock:lm129", "LM129 BT", 100, false,
+                    "蓝牙", "蓝牙模拟", 30));
                 result.Devices.Add(MockDevice(
-                    "mock:low", "低电量测试鼠标", 4, false, "2.4G", "模拟", 12));
-                result.AddNote("模拟模式：显示 4 个假设备。");
+                    "mock:low", L10n.T("低电量测试鼠标", "Low Battery Test Mouse"),
+                    4, false, "2.4G", "模拟", 12));
+                result.AddNote(L10n.T(
+                    "模拟模式：显示 4 个假设备。",
+                    "Mock mode: 4 fake devices."));
             }
             else
             {

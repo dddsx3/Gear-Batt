@@ -19,6 +19,7 @@ namespace GearBatt
         private static void Main(string[] args)
         {
             Native.EnableDpiAwareness();
+            L10n.Initialize(GetArgValue(args, "--lang"));
 
             bool mock = HasArg(args, "--mock");
             string outPath = GetArgValue(args, "--out");
@@ -65,7 +66,9 @@ namespace GearBatt
             Application.ThreadException += delegate(object sender, ThreadExceptionEventArgs e)
             {
                 MessageBox.Show(
-                    "Gear-Batt 发生未处理的错误：\n\n" + e.Exception.Message,
+                    L10n.T("Gear-Batt 发生未处理的错误：\n\n",
+                        "Gear-Batt encountered an unhandled error:\n\n") +
+                    e.Exception.Message,
                     "Gear-Batt", MessageBoxButtons.OK, MessageBoxIcon.Error);
             };
 
@@ -77,7 +80,9 @@ namespace GearBatt
             if (!createdNew)
             {
                 MessageBox.Show(
-                    "Gear-Batt 已在运行。\n请查看任务栏通知区域（可能需要展开隐藏图标）。",
+                    L10n.T(
+                        "Gear-Batt 已在运行。\n请查看任务栏通知区域（可能需要展开隐藏图标）。",
+                        "Gear-Batt is already running.\nCheck the notification area (you may need to expand hidden icons)."),
                     "Gear-Batt", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
@@ -89,7 +94,8 @@ namespace GearBatt
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    "Gear-Batt 启动失败：\n\n" + ex.Message,
+                    L10n.T("Gear-Batt 启动失败：\n\n",
+                        "Gear-Batt failed to start:\n\n") + ex.Message,
                     "Gear-Batt", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
@@ -189,8 +195,9 @@ namespace GearBatt
             else if (string.IsNullOrEmpty(outPath))
             {
                 MessageBox.Show(
-                    report.ToString() + "\n\n报告已保存到：\n" + path,
-                    "Gear-Batt 诊断",
+                    report.ToString() + L10n.T(
+                        "\n\n报告已保存到：\n", "\n\nReport saved to:\n") + path,
+                    L10n.T("Gear-Batt 诊断", "Gear-Batt diagnostics"),
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
@@ -415,16 +422,35 @@ namespace GearBatt
 
         private static void ShowHelp()
         {
-            string text =
-                "Gear-Batt " + GetVersion() + "\n\n" +
-                "用法：\n" +
-                "  Gear-Batt.exe                     启动托盘图标\n" +
-                "  Gear-Batt.exe --mock              使用模拟设备\n" +
-                "  Gear-Batt.exe --select <设备id>   指定要显示的设备\n" +
-                "  Gear-Batt.exe --diag [--out 文件] [--verbose]\n" +
-                "  Gear-Batt.exe --selftest [--out 文件]\n" +
-                "  Gear-Batt.exe --render-icons <目录>\n\n" +
-                "诊断模式会列出当前能读取到的设备和原始错误信息。";
+            string text;
+            if (L10n.Chinese)
+            {
+                text =
+                    "Gear-Batt " + GetVersion() + "\n\n" +
+                    "用法：\n" +
+                    "  Gear-Batt.exe                     启动托盘图标\n" +
+                    "  Gear-Batt.exe --lang zh|en        强制界面语言\n" +
+                    "  Gear-Batt.exe --mock              使用模拟设备\n" +
+                    "  Gear-Batt.exe --select <设备id>   指定要显示的设备\n" +
+                    "  Gear-Batt.exe --diag [--out 文件] [--verbose]\n" +
+                    "  Gear-Batt.exe --selftest [--out 文件]\n" +
+                    "  Gear-Batt.exe --render-icons <目录>\n\n" +
+                    "诊断模式会列出当前能读取到的设备和原始错误信息。";
+            }
+            else
+            {
+                text =
+                    "Gear-Batt " + GetVersion() + "\n\n" +
+                    "Usage:\n" +
+                    "  Gear-Batt.exe                     Start the tray icon\n" +
+                    "  Gear-Batt.exe --lang zh|en        Force UI language\n" +
+                    "  Gear-Batt.exe --mock              Use mock devices\n" +
+                    "  Gear-Batt.exe --select <device-id> Select the displayed device\n" +
+                    "  Gear-Batt.exe --diag [--out file] [--verbose]\n" +
+                    "  Gear-Batt.exe --selftest [--out file]\n" +
+                    "  Gear-Batt.exe --render-icons <dir>\n\n" +
+                    "Diagnostics lists readable devices and raw error details.";
+            }
             bool attached = Native.AttachConsole(Native.ATTACH_PARENT_PROCESS);
             if (attached)
             {

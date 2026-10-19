@@ -19,7 +19,7 @@ namespace GearBatt
             if (_scale <= 0.5f || _scale > 4f)
                 _scale = 1f;
 
-            Text = "低电量提醒";
+            Text = L10n.T("低电量提醒", "Low battery");
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
             TopMost = true;
@@ -49,7 +49,7 @@ namespace GearBatt
             Controls.Add(_icon);
 
             Label title = new Label();
-            title.Text = "低电量提醒";
+            title.Text = L10n.T("低电量提醒", "Low battery");
             title.Font = new Font(Font.FontFamily, 11.5f, FontStyle.Bold);
             title.ForeColor = Color.FromArgb(255, 107, 107);
             title.BackColor = Color.Transparent;
@@ -95,7 +95,9 @@ namespace GearBatt
         public void UpdateDevice(WirelessDevice device)
         {
             _device.Text = device.Name;
-            _message.Text = "剩余 " + device.Percent + "%，请尽快充电。";
+            _message.Text = L10n.T(
+                "剩余 " + device.Percent + "%，请尽快充电。",
+                device.Percent + "% remaining. Please charge soon.");
             if (_iconImage != null)
             {
                 _icon.Image = null;

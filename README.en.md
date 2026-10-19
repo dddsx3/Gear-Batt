@@ -4,7 +4,7 @@
 
 A minimal Windows tray utility that reads the battery level of wireless peripherals (2.4 GHz receivers / Bluetooth) and shows it in the notification area. While charging it shows a lightning bolt; on battery it fills the icon proportionally and displays the percentage.
 
-> The application UI is currently in Chinese. This English README covers installation, usage, privacy, and development.
+> The application UI follows the Windows display language (Chinese/English); use `--lang zh|en` to override. This English README covers installation, usage, privacy, and development.
 
 ![Gear-Batt](docs/app-icon.png)
 
@@ -21,12 +21,21 @@ A minimal Windows tray utility that reads the battery level of wireless peripher
 - **Remembers selection**: stored in `%LOCALAPPDATA%\Gear-Batt\settings.ini`.
 - **Optional autostart**: starts for the current user; respects the disabled state in Task Manager → Startup.
 - **No network access in the main app**.
+- **UI follows the system language**: the main app and collector follow the Windows display language (Chinese/English); override with `--lang zh|en`.
+
+## UI language
+
+At startup the main app and collector read the Windows display language:
+
+- Chinese Windows: Chinese UI
+- Other languages: English UI
+- Override: `Gear-Batt.exe --lang zh` or `--lang en`; the collector supports `--lang zh|en` too
 
 ## Help adapt your device (voluntary)
 
 `Gear-Batt-Collector.exe` is a separate, optional, voluntary compatibility data collector. It is not required to use Gear-Batt.
 
-![Gear-Batt Collector](docs/collector.png)
+![Gear-Batt Collector](docs/collector-en.png)
 
 1. Double-click `Gear-Batt-Collector.exe`.
 2. Read the notice; the collect button is enabled only after checking the voluntary consent box.
@@ -91,7 +100,7 @@ When the selected device is not charging and its level is below 5%, a silent car
 - Shown once per low-battery episode; resets after the level reaches 5% or charging starts
 - Only for the currently displayed device; no alert while charging
 
-![Low-battery alert](docs/low-battery.png)
+![Low-battery alert](docs/low-battery-en.png)
 
 ## Icon states
 
@@ -138,7 +147,7 @@ build.cmd
 
 Outputs:
 
-- `dist\Gear-Batt.exe` — main tray app (about 110 KB)
+- `dist\Gear-Batt.exe` — main tray app (about 115 KB)
 - `dist\Gear-Batt-Collector.exe` — voluntary data collector (about 100 KB)
 
 Source layout:
@@ -182,6 +191,7 @@ Source layout:
 
 ## Version
 
+- **v1.3.1**: main app and collector UI follow the Windows display language (Chinese/English); override with `--lang zh|en`.
 - **v1.3.0**: device attach/remove and power-status changes refresh immediately; 5-second fast polling while charging or at ≤10%; low-battery card no longer auto-closes and must be dismissed with ×.
 - **v1.2.0**: low-battery card for the selected device below 5% while discharging (silent, no focus stealing, once per episode).
 - **v1.1.0**: HID++ 2.0 byte layout and `0x1000/0x1004/0x1001` parsing fixes; ATK/VXE 373B:1216 and DARKRIM 3654:6901 read-only protocols; Bluetooth enumeration/0% handling; StartupApproved awareness; 60-second refresh and update time; voluntary collector.

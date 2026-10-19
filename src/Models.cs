@@ -32,10 +32,10 @@ namespace GearBatt
             get
             {
                 if (Charging)
-                    return "充电中";
+                    return L10n.T("充电中", "Charging");
                 if (Percent < 0)
-                    return "电量未知";
-                return "电池供电";
+                    return L10n.T("电量未知", "Unknown");
+                return L10n.T("电池供电", "On battery");
             }
         }
 
@@ -43,7 +43,9 @@ namespace GearBatt
         {
             get
             {
-                string source = string.IsNullOrEmpty(Source) ? "" : "  ·  " + Source;
+                string source = string.IsNullOrEmpty(Source)
+                    ? ""
+                    : "  ·  " + L10n.Source(Source);
                 return Name + "    " + PercentText + "  ·  " + StatusText + source;
             }
         }
@@ -54,11 +56,19 @@ namespace GearBatt
             {
                 string status;
                 if (Charging)
-                    status = Percent < 0 ? "充电中" : PercentText + " · 充电中";
+                {
+                    status = Percent < 0
+                        ? L10n.T("充电中", "Charging")
+                        : PercentText + L10n.T(" · 充电中", " · Charging");
+                }
                 else if (Percent < 0)
-                    status = "电量未知";
+                {
+                    status = L10n.T("电量未知", "Unknown");
+                }
                 else
-                    status = PercentText + " · 电池";
+                {
+                    status = PercentText + L10n.T(" · 电池", " · Battery");
+                }
                 return Name + " · " + status;
             }
         }

@@ -141,11 +141,15 @@ namespace GearBatt
 
             CollectorResult result = new CollectorResult();
             result.ReportPath = path;
-            result.Summary =
+            result.Summary = L10n.T(
+                "检测到设备：" + scan.Devices.Count + "\r\n" +
+                "HID 接口：" + hid.Count + "\r\n" +
+                "罗技 HID++ 接口：" + hidppInterfaces + "\r\n" +
+                "已知厂商接口：" + vendorInterfaces,
                 "Devices found: " + scan.Devices.Count + "\r\n" +
                 "HID interfaces: " + hid.Count + "\r\n" +
                 "Logitech HID++ interfaces: " + hidppInterfaces + "\r\n" +
-                "Known vendor interfaces: " + vendorInterfaces;
+                "Known vendor interfaces: " + vendorInterfaces);
             return result;
         }
 
