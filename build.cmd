@@ -28,6 +28,7 @@ if not exist dist mkdir dist
     src\VendorProtocols.cs ^
     src\IconRenderer.cs ^
     src\LowBatteryPopup.cs ^
+    src\StateEventForm.cs ^
     src\Settings.cs ^
     src\TrayApp.cs ^
     src\Program.cs

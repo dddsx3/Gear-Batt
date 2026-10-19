@@ -6,7 +6,6 @@ namespace GearBatt
 {
     internal sealed class LowBatteryPopup : Form
     {
-        private readonly Timer _timer;
         private readonly PictureBox _icon;
         private readonly Label _device;
         private readonly Label _message;
@@ -82,11 +81,6 @@ namespace GearBatt
             close.Click += delegate { Close(); };
             Controls.Add(close);
 
-            _timer = new Timer();
-            _timer.Interval = 10000;
-            _timer.Tick += delegate { Close(); };
-            _timer.Start();
-
             Paint += delegate(object sender, PaintEventArgs e)
             {
                 using (Pen pen = new Pen(Color.FromArgb(70, 70, 76),
@@ -110,8 +104,6 @@ namespace GearBatt
             _iconImage = IconRenderer.RenderBitmap(
                 S(56), device.Percent, false, false);
             _icon.Image = _iconImage;
-            _timer.Stop();
-            _timer.Start();
         }
 
         protected override bool ShowWithoutActivation
@@ -139,8 +131,6 @@ namespace GearBatt
         {
             if (disposing)
             {
-                _timer.Stop();
-                _timer.Dispose();
                 if (_iconImage != null)
                 {
                     _iconImage.Dispose();

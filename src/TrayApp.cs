@@ -28,6 +28,9 @@ namespace GearBatt
         private DateTime _lastUpdated = DateTime.MinValue;
         private LowBatteryPopup _lowBatteryPopup;
         private string _lowBatteryAlertedDeviceId = "";
+        private readonly StateEventForm _eventForm;
+        private readonly System.Windows.Forms.Timer _eventDebounce;
+        private bool _pendingScan;
 
         public TrayApp(bool mock)
         {
@@ -35,21 +38,15 @@ namespace GearBatt
             _settings = Settings.Load();
             _selectedId = _settings.SelectedId ?? "";
 
-            Control ui = new Control();
-            ui.CreateControl();
-            if (!ui.IsHandleCreated)
+            _eventForm = new StateEventForm();
+            _ui = _eventForm;
+            _eventDebounce = new System.Windows.Forms.Timer();
+            _eventDebounce.Interval = 450;
+            _eventDebounce.Tick += delegate
             {
-                ui.Dispose();
-                Form hidden = new Form();
-                hidden.ShowInTaskbar = false;
-                hidden.FormBorderStyle = FormBorderStyle.None;
-                hidden.StartPosition = FormStartPosition.Manual;
-                hidden.Location = new Point(-32000, -32000);
-                hidden.Size = new Size(1, 1);
-                hidden.CreateControl();
-                ui = hidden;
-            }
-            _ui = ui;
+                _eventDebounce.Stop();
+                BeginScan(false);
+            };
 
             _menu = new ContextMenuStrip();
             _menu.RenderMode = ToolStripRenderMode.System;
@@ -67,6 +64,10 @@ namespace GearBatt
             _timer.Start();
 
             SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+            SystemEvents.PowerModeChanged += OnPowerModeChanged;
+
+            _eventForm.StateChanged += delegate { PostStateChanged(); };
+            _eventForm.Show();
 
             RebuildMenu();
             BeginScan(false);
@@ -74,8 +75,13 @@ namespace GearBatt
 
         private void BeginScan(bool userInitiated)
         {
-            if (_scanning || _disposed)
+            if (_disposed)
                 return;
+            if (_scanning)
+            {
+                _pendingScan = true;
+                return;
+            }
 
             _scanning = true;
             RebuildMenu();
@@ -142,6 +148,13 @@ namespace GearBatt
             UpdateTray();
             RebuildMenu();
             CheckLowBattery(selected);
+            UpdateRefreshInterval(selected);
+
+            if (_pendingScan && !_disposed)
+            {
+                _pendingScan = false;
+                BeginScan(false);
+            }
         }
 
         private void UpdateTray()
@@ -345,6 +358,7 @@ namespace GearBatt
             _settings.Save();
             UpdateTray();
             CheckLowBattery(device);
+            UpdateRefreshInterval(device);
 
             _menuNeedsRebuild = true;
             if (!_menu.Visible)
@@ -393,6 +407,43 @@ namespace GearBatt
             popup.Show();
         }
 
+        private void OnPowerModeChanged(
+            object sender, PowerModeChangedEventArgs e)
+        {
+            if (e.Mode == PowerModes.StatusChange ||
+                e.Mode == PowerModes.Resume)
+                PostStateChanged();
+        }
+
+        private void PostStateChanged()
+        {
+            if (_disposed)
+                return;
+            try
+            {
+                _ui.BeginInvoke(new Action(delegate
+                {
+                    if (_disposed)
+                        return;
+                    _eventDebounce.Stop();
+                    _eventDebounce.Start();
+                }));
+            }
+            catch (Exception)
+            {
+            }
+        }
+
+        private void UpdateRefreshInterval(WirelessDevice selected)
+        {
+            int interval = 60000;
+            if (selected != null && (selected.Charging ||
+                (selected.Percent >= 0 && selected.Percent <= 10)))
+                interval = 5000;
+            if (_timer.Interval != interval)
+                _timer.Interval = interval;
+        }
+
         private void ToggleAutostart()
         {
             bool enable = !Settings.IsAutostartEnabled();
@@ -409,7 +460,7 @@ namespace GearBatt
         private void ShowAbout()
         {
             string text =
-                "Gear-Batt 1.2\n\n" +
+                "Gear-Batt 1.3\n\n" +
                 "显示所选无线设备的电量与充电状态。\n\n" +
                 "支持来源：\n" +
                 "• Windows 电池接口（部分 2.4G 接收器）\n" +
@@ -417,9 +468,11 @@ namespace GearBatt
                 "• ATK/VXE 373B:1216（只读查询）\n" +
                 "• DARKRIM 3654:6901（只读查询）\n" +
                 "• Windows 蓝牙设备电量属性\n\n" +
+                "状态刷新：设备接入/移除、电源状态变化会立即刷新；\n" +
+                "充电或电量 ≤10% 时每 5 秒快速检查，其余时间 60 秒。\n\n" +
                 "低电量提醒：当前显示的设备未充电且电量低于 5% 时，\n" +
-                "会静默弹出一个提示卡片（不播放声音、不抢焦点、10 秒自动关闭）。\n" +
-                "同一轮低电量只提醒一次；电量回升或开始充电后重置。\n\n" +
+                "会静默弹出一个提示卡片（不播放声音、不抢焦点、不会自动关闭；\n" +
+                "点击右上角 × 关闭）。同一轮低电量只提醒一次。\n\n" +
                 "设备本身必须上报电量。使用私有协议且不向系统上报电量的设备无法读取；\n" +
                 "可以运行“帮助适配我的设备…”采集本机数据，帮助后续适配。\n\n" +
                 "左键单击托盘图标可选择要显示的设备；悬停可查看精确电量。";
@@ -505,11 +558,22 @@ namespace GearBatt
             _disposed = true;
 
             SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+            SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+            _pendingScan = false;
 
             try
             {
                 _timer.Stop();
                 _timer.Dispose();
+            }
+            catch (Exception)
+            {
+            }
+
+            try
+            {
+                _eventDebounce.Stop();
+                _eventDebounce.Dispose();
             }
             catch (Exception)
             {
@@ -545,6 +609,14 @@ namespace GearBatt
             try
             {
                 _menu.Dispose();
+            }
+            catch (Exception)
+            {
+            }
+
+            try
+            {
+                _eventForm.Close();
             }
             catch (Exception)
             {
