@@ -325,6 +325,27 @@ namespace GearBatt
                     report.AppendLine();
                 }
 
+                if (info.VendorId == CxReceiverProvider.VendorId &&
+                    info.UsagePage == CxReceiverProvider.UsagePage &&
+                    info.Usage == CxReceiverProvider.Usage &&
+                    info.OutputReportLength >= CxReceiverProvider.ReportLength)
+                {
+                    count++;
+                    report.AppendLine("CX 2.4G receiver (260D)");
+                    report.AppendLine("  Instance: " + SanitizeInstanceId(info.InstanceId));
+                    byte[] request;
+                    byte[] response;
+                    string detail;
+                    CxBattery battery = CxReceiverProvider.Query(
+                        info, out request, out response, out detail);
+                    report.AppendLine("  Request: " + TextUtil.Hex(request, 32));
+                    report.AppendLine("  Response: " + TextUtil.Hex(response, 32));
+                    report.AppendLine("  Result: " + (battery != null
+                        ? battery.Detail
+                        : detail));
+                    report.AppendLine();
+                }
+
                 if (info.VendorId == DarkrimProtocol.VendorId &&
                     info.UsagePage == DarkrimProtocol.UsagePage &&
                     info.Usage == DarkrimProtocol.Usage &&

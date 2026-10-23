@@ -125,6 +125,223 @@ namespace GearBatt
         }
     }
 
+    internal sealed class CxBattery
+    {
+        public int Percent = -1;
+        public bool Wired;
+        public int VoltageMv;
+        public string Detail = "";
+    }
+
+    internal sealed class CxReceiverProvider
+    {
+        // CX 2.4G receiver (for example VID 260D PID 1163, product string
+        // "2.4G Wireless Receiver"). Vendor interface is usage page 0xFF02 /
+        // usage 0x0002 with 17-byte input and output reports. The battery
+        // query is the 17-byte report 0x08 command 0x04 with trailing 0x49
+        // (the same framing as ATK/VXE "protocol 1"); the reply echoes
+        // 08 04 and carries percent at byte 6, a wired flag at byte 7 and
+        // the battery voltage in millivolts at bytes 8-9 (big endian).
+        // The mouse only answers while its radio link is active; when it
+        // sleeps the query times out, so the last successful reading is
+        // cached and reused for a while.
+        public const ushort VendorId = 0x260D;
+        public const ushort UsagePage = 0xFF02;
+        public const ushort Usage = 0x0002;
+        public const int ReportLength = 17;
+
+        private sealed class CachedReading
+        {
+            public CxBattery Battery;
+            public DateTime Time;
+            public string Name;
+        }
+
+        private readonly object _cacheLock = new object();
+        private readonly Dictionary<string, CachedReading> _cache =
+            new Dictionary<string, CachedReading>(
+                StringComparer.OrdinalIgnoreCase);
+
+        // True when the last scan saw a CX receiver but could not read it
+        // (mouse asleep and no cached value). The tray app polls faster
+        // while this is set so the device appears soon after the mouse
+        // wakes up.
+        public bool PendingUnread { get; private set; }
+
+        public void Scan(ScanResult result, List<string> log)
+        {
+            PendingUnread = false;
+            List<HidDeviceInfo> interfaces = HidDevices.Enumerate(false);
+            for (int i = 0; i < interfaces.Count; i++)
+            {
+                HidDeviceInfo info = interfaces[i];
+                if (info.VendorId != VendorId ||
+                    info.UsagePage != UsagePage ||
+                    info.Usage != Usage ||
+                    info.OutputReportLength < ReportLength ||
+                    info.InputReportLength < ReportLength)
+                    continue;
+                PendingUnread = true;
+
+                byte[] request;
+                byte[] response;
+                string detail;
+                CxBattery battery = Query(info, out request, out response,
+                    out detail);
+                string name = info.ResolveName(L10n.T(
+                    "CX 2.4G 无线接收器", "CX 2.4G receiver"));
+                bool cached = false;
+
+                if (battery == null)
+                {
+                    lock (_cacheLock)
+                    {
+                        CachedReading previous;
+                        if (_cache.TryGetValue(info.InstanceId, out previous) &&
+                            (DateTime.Now - previous.Time).TotalHours < 12.0)
+                        {
+                            battery = previous.Battery;
+                            name = previous.Name;
+                            cached = true;
+                        }
+                    }
+                    if (battery == null)
+                    {
+                        if (log != null)
+                            log.Add("cx: " + info.InstanceId + " " + detail);
+                        continue;
+                    }
+                }
+                else
+                {
+                    PendingUnread = false;
+                    lock (_cacheLock)
+                    {
+                        CachedReading entry = new CachedReading();
+                        entry.Battery = battery;
+                        entry.Time = DateTime.Now;
+                        entry.Name = name;
+                        _cache[info.InstanceId] = entry;
+                    }
+                }
+
+                WirelessDevice device = new WirelessDevice();
+                device.Id = "cx:" + info.InstanceId;
+                device.Name = name;
+                device.Percent = battery.Percent;
+                device.Charging = battery.Wired;
+                device.VoltageMv = battery.VoltageMv;
+                device.Source = "2.4G";
+                device.Provider = "CX";
+                device.InstanceId = info.InstanceId;
+                device.Detail = "CX: " + battery.Detail +
+                    (cached
+                        ? " (cached " + DateTime.Now.ToString("HH:mm") + ")"
+                        : "");
+                device.SortOrder = 4;
+                result.Devices.Add(device);
+
+                if (log != null)
+                    log.Add("cx: " + device.Name + " " + battery.Detail +
+                        (cached ? " [cached]" : ""));
+            }
+        }
+
+        internal static CxBattery Query(
+            HidDeviceInfo info, out byte[] request,
+            out byte[] response, out string detail)
+        {
+            request = null;
+            response = null;
+            detail = "";
+
+            using (HidppConnection connection = HidppConnection.Open(info.Path))
+            {
+                if (connection == null)
+                {
+                    detail = "cannot open HID interface";
+                    return null;
+                }
+
+                int reportLength = Math.Max(
+                    ReportLength, connection.OutputReportLength);
+                byte[] report = new byte[reportLength];
+                report[0] = 0x08;
+                report[1] = 0x04;
+                if (reportLength >= ReportLength)
+                    report[ReportLength - 1] = 0x49;
+                request = report;
+
+                byte[] buffer = new byte[Math.Max(
+                    ReportLength, connection.InputReportLength)];
+                for (int attempt = 0; attempt < 3; attempt++)
+                {
+                    if (!connection.WriteRaw(report, 250))
+                    {
+                        detail = "write failed";
+                        continue;
+                    }
+
+                    int deadline = Environment.TickCount + 800;
+                    while (true)
+                    {
+                        int remaining = deadline - Environment.TickCount;
+                        if (remaining <= 0)
+                            break;
+                        int read = connection.ReadRaw(
+                            buffer, Math.Min(250, remaining));
+                        if (read < 10)
+                            continue;
+
+                        byte[] candidate = new byte[read];
+                        Array.Copy(buffer, 0, candidate, 0, read);
+                        CxBattery battery = ParseResponse(candidate);
+                        if (battery != null)
+                        {
+                            response = candidate;
+                            detail = battery.Detail;
+                            return battery;
+                        }
+                    }
+                }
+
+                detail = "no response (mouse asleep or off)";
+                return null;
+            }
+        }
+
+        internal static CxBattery ParseResponse(byte[] report)
+        {
+            if (report == null || report.Length < 10)
+                return null;
+            if (report[0] != 0x08 || report[1] != 0x04)
+                return null;
+
+            int percent = report[6];
+            if (percent < 0 || percent > 100)
+                percent = -1;
+            bool wired = report[7] != 0;
+
+            int bigEndian = (report[8] << 8) | report[9];
+            int littleEndian = (report[9] << 8) | report[8];
+            int millivolts = bigEndian;
+            if (millivolts < 2500 || millivolts > 5500)
+                millivolts = littleEndian;
+            if (millivolts < 2500 || millivolts > 5500)
+                millivolts = 0;
+
+            CxBattery battery = new CxBattery();
+            battery.Percent = percent;
+            battery.Wired = wired;
+            battery.VoltageMv = millivolts;
+            battery.Detail = string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "level={0} wired={1} voltage={2}mV mode={3}",
+                percent, wired, millivolts, report[5]);
+            return battery;
+        }
+    }
+
     internal sealed class AtkVxeProvider
     {
         public const ushort VendorId = 0x373B;

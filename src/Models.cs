@@ -11,6 +11,7 @@ namespace GearBatt
         public int Percent = -1;
         public bool PercentApproximate;
         public bool Charging;
+        public int VoltageMv;
         public string Source = "无线";
         public string Provider = "";
         public string Detail = "";
@@ -46,7 +47,12 @@ namespace GearBatt
                 string source = string.IsNullOrEmpty(Source)
                     ? ""
                     : "  ·  " + L10n.Source(Source);
-                return Name + "    " + PercentText + "  ·  " + StatusText + source;
+                string voltage = VoltageMv > 0
+                    ? "  ·  " + (VoltageMv / 1000.0).ToString("0.00",
+                        System.Globalization.CultureInfo.InvariantCulture) + "V"
+                    : "";
+                return Name + "    " + PercentText + "  ·  " + StatusText +
+                    source + voltage;
             }
         }
 
@@ -69,7 +75,11 @@ namespace GearBatt
                 {
                     status = PercentText + L10n.T(" · 电池", " · Battery");
                 }
-                return Name + " · " + status;
+                string suffix = VoltageMv > 0
+                    ? " · " + (VoltageMv / 1000.0).ToString("0.00",
+                        System.Globalization.CultureInfo.InvariantCulture) + "V"
+                    : "";
+                return Name + " · " + status + suffix;
             }
         }
     }

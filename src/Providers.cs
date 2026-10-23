@@ -372,6 +372,24 @@ namespace GearBatt
                         set, ref did, Native.DEVPKEY_Bluetooth_Battery, out percent))
                     continue;
 
+                // A disconnected Bluetooth device keeps its last battery value
+                // forever (for example a mouse switched to 2.4G mode). Skip
+                // entries whose battery value has not been refreshed recently.
+                DateTime batteryUpdated;
+                if (Native.TryReadFileTimeProperty(
+                        set, ref did, Native.DEVPKEY_Bluetooth_BatteryUpdated,
+                        out batteryUpdated) &&
+                    batteryUpdated > DateTime.MinValue &&
+                    (DateTime.Now - batteryUpdated).TotalDays > 7.0)
+                {
+                    if (log != null)
+                        log.Add("bluetooth: skipped stale entry " +
+                            Native.GetFriendlyName(set, ref did) +
+                            " (battery updated " +
+                            batteryUpdated.ToString("yyyy-MM-dd") + ")");
+                    continue;
+                }
+
                 bool charging;
                 Native.TryReadBoolProperty(
                     set, ref did, Native.DEVPKEY_Bluetooth_BatteryCharging, out charging);
@@ -423,6 +441,14 @@ namespace GearBatt
         private readonly HidppProvider _hidpp = new HidppProvider();
         private readonly AtkVxeProvider _atk = new AtkVxeProvider();
         private readonly DarkrimProvider _darkrim = new DarkrimProvider();
+        private readonly CxReceiverProvider _cx = new CxReceiverProvider();
+
+        // True when a CX 2.4G receiver is present but its mouse could not
+        // be read during the last scan (asleep, no cached value yet).
+        public bool CxReceiverPending
+        {
+            get { return _cx.PendingUnread; }
+        }
 
         public ScanResult Scan(bool mock, bool verbose)
         {
@@ -465,6 +491,15 @@ namespace GearBatt
                 catch (Exception ex)
                 {
                     result.AddError("蓝牙属性: " + ex.Message);
+                }
+
+                try
+                {
+                    _cx.Scan(result, log);
+                }
+                catch (Exception ex)
+                {
+                    result.AddError("CX 2.4G: " + ex.Message);
                 }
 
                 try
@@ -560,6 +595,13 @@ namespace GearBatt
                 if (hasHidpp && d.Provider == "Windows" &&
                     TextUtil.IsLikelyLogitechPath(d.InstanceId))
                     continue;
+                if (d.Provider == "Windows" &&
+                    PathHasVid(d.InstanceId, "VID_260D") &&
+                    sorted.Exists(delegate(WirelessDevice b)
+                    {
+                        return b.Provider == "CX";
+                    }))
+                    continue;
                 if (hasAtk && d.Provider == "Windows" &&
                     PathHasVid(d.InstanceId, "VID_373B"))
                     continue;
@@ -604,7 +646,7 @@ namespace GearBatt
         private static int Priority(WirelessDevice d)
         {
             if (d.Provider == "HID++" || d.Provider == "ATK/VXE" ||
-                d.Provider == "DARKRIM")
+                d.Provider == "DARKRIM" || d.Provider == "CX")
                 return 0;
             if (d.Provider == "蓝牙")
                 return 1;

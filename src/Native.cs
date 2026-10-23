@@ -77,6 +77,10 @@ namespace GearBatt
         public const uint DEVPROP_TYPE_STRING_LIST = 0x00002012;
         public const uint DEVPROP_TYPE_BYTE = 0x00000003;
         public const uint DEVPROP_TYPE_BOOLEAN = 0x00000011;
+        public const uint DEVPROP_TYPE_FILETIME = 0x00000010;
+
+        public static readonly DEVPROPKEY DEVPKEY_Bluetooth_BatteryUpdated =
+            new DEVPROPKEY(new Guid("104EA319-6EE2-4701-BD47-8DDBF425BBE5"), 7);
 
         [StructLayout(LayoutKind.Sequential)]
         public struct SP_DEVINFO_DATA
@@ -477,6 +481,34 @@ namespace GearBatt
                 return false;
             value = buffer[0] != 0;
             return true;
+        }
+
+        public static bool TryReadFileTimeProperty(
+            IntPtr deviceInfoSet, ref SP_DEVINFO_DATA deviceInfoData,
+            DEVPROPKEY key, out DateTime value)
+        {
+            byte[] buffer = new byte[16];
+            uint type;
+            int required;
+            value = DateTime.MinValue;
+            if (!SetupDiGetDevicePropertyW(
+                    deviceInfoSet, ref deviceInfoData, ref key, out type,
+                    buffer, buffer.Length, out required, 0))
+                return false;
+            if (type != DEVPROP_TYPE_FILETIME || required < 8)
+                return false;
+            long fileTime = BitConverter.ToInt64(buffer, 0);
+            if (fileTime <= 0)
+                return false;
+            try
+            {
+                value = DateTime.FromFileTimeUtc(fileTime).ToLocalTime();
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         public static string ReadStringPropertyCm(uint devInst, DEVPROPKEY key)

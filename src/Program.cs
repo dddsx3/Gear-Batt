@@ -172,7 +172,7 @@ namespace GearBatt
             }
 
             report.AppendLine();
-            report.AppendLine("Hint: only devices that report battery to Windows, Logitech HID++, ATK/VXE, DARKRIM, or the Bluetooth battery property can be listed.");
+            report.AppendLine("Hint: only devices that report battery to Windows, Logitech HID++, CX 2.4G, ATK/VXE, DARKRIM, or the Bluetooth battery property can be listed. A sleeping 2.4G mouse may not answer until it is moved.");
 
             string path = string.IsNullOrEmpty(outPath)
                 ? Path.Combine(Path.GetTempPath(), "GearBatt-diag.txt")
@@ -254,6 +254,26 @@ namespace GearBatt
                 AtkVxeProvider.TryParseResponse(
                     new byte[] { 0x08, 0x72, 0, 0, 0, 0x07, 0, 87 },
                     out atkPercent) && atkPercent == 87);
+
+            byte[] cxFull = new byte[]
+            {
+                0x08, 0x04, 0x00, 0x00, 0x00, 0x02, 0x64, 0x00,
+                0x10, 0xE0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF3
+            };
+            CxBattery cxParsed = CxReceiverProvider.ParseResponse(cxFull);
+            Check(sb, ref failures, "CX full battery",
+                cxParsed != null && cxParsed.Percent == 100 &&
+                !cxParsed.Wired && cxParsed.VoltageMv == 4320);
+
+            byte[] cxMid = new byte[]
+            {
+                0x08, 0x04, 0x00, 0x00, 0x00, 0x02, 0x37, 0x01,
+                0x0F, 0xA0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            };
+            CxBattery cxWired = CxReceiverProvider.ParseResponse(cxMid);
+            Check(sb, ref failures, "CX mid battery wired",
+                cxWired != null && cxWired.Percent == 55 &&
+                cxWired.Wired && cxWired.VoltageMv == 4000);
 
             byte[] darkrimQuery = DarkrimProtocol.BuildBatteryQuery();
             Check(sb, ref failures, "DARKRIM query CRC",

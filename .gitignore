@@ -4,3 +4,4 @@ preview/
 *.user
 *.suo
 .vs/
+dist/GearBattProbe.exe

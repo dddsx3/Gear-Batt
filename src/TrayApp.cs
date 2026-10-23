@@ -461,7 +461,15 @@ namespace GearBatt
             int interval = 60000;
             if (selected != null && (selected.Charging ||
                 (selected.Percent >= 0 && selected.Percent <= 10)))
+            {
                 interval = 5000;
+            }
+            else if (selected == null && _scanner.CxReceiverPending)
+            {
+                // A CX receiver is present but the mouse is asleep; retry
+                // more often so the device shows up right after it wakes.
+                interval = 10000;
+            }
             if (_timer.Interval != interval)
                 _timer.Interval = interval;
         }
@@ -486,14 +494,15 @@ namespace GearBatt
             if (L10n.Chinese)
             {
                 text =
-                    "Gear-Batt 1.3.1\n\n" +
+                    "Gear-Batt 1.4.0\n\n" +
                     "显示所选无线设备的电量与充电状态。\n\n" +
-                    "支持来源：\n" +
-                    "• Windows 电池接口（部分 2.4G 接收器）\n" +
-                    "• 罗技 HID++ 2.0（Unifying / Bolt / Lightspeed）\n" +
-                    "• ATK/VXE 373B:1216（只读查询）\n" +
-                    "• DARKRIM 3654:6901（只读查询）\n" +
-                    "• Windows 蓝牙设备电量属性\n\n" +
+                "支持来源：\n" +
+                "• Windows 电池接口（部分 2.4G 接收器）\n" +
+                "• 罗技 HID++ 2.0（Unifying / Bolt / Lightspeed）\n" +
+                "• CX 2.4G 接收器（如 260D:1163，含电压）\n" +
+                "• ATK/VXE 373B:1216（只读查询）\n" +
+                "• DARKRIM 3654:6901（只读查询）\n" +
+                "• Windows 蓝牙设备电量属性\n\n" +
                     "状态刷新：设备接入/移除、电源状态变化会立即刷新；\n" +
                     "充电或电量 ≤10% 时每 5 秒快速检查，其余时间 60 秒。\n\n" +
                     "低电量提醒：当前显示的设备未充电且电量低于 5% 时，\n" +
@@ -506,11 +515,12 @@ namespace GearBatt
             else
             {
                 text =
-                    "Gear-Batt 1.3.1\n\n" +
+                    "Gear-Batt 1.4.0\n\n" +
                     "Shows the battery and charging state of the selected wireless device.\n\n" +
                     "Supported sources:\n" +
                     "• Windows battery interface (some 2.4 GHz receivers)\n" +
                     "• Logitech HID++ 2.0 (Unifying / Bolt / Lightspeed)\n" +
+                    "• CX 2.4G receivers (e.g. 260D:1163, with voltage)\n" +
                     "• ATK/VXE 373B:1216 (read-only)\n" +
                     "• DARKRIM 3654:6901 (read-only)\n" +
                     "• Windows Bluetooth battery property\n\n" +

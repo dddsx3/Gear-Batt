@@ -62,18 +62,22 @@ The main app menu also has “Help adapt my device…” (帮助适配我的设�
    - `0x1001` Battery Voltage (estimated percentage, marked as approximate)
    - `0x0005` Device Name
 
-3. **ATK / VXE wireless mice (373B:1216)**  
+3. **CX 2.4G receivers (e.g. 260D:1163)**  
+   Read-only battery query: usage page `0xFF02`, 17-byte bidirectional reports, Report ID `0x08` command `0x04` (the same framing as ATK/VXE "protocol 1"). The reply carries the percentage at byte 6, a wired/charging flag at byte 7, and the battery voltage in millivolts at bytes 8-9 (big endian). The tooltip and menu show the voltage (for example `4.32V`).
+   Note: these mice do not answer while asleep; move the mouse once for the first reading. Afterwards the last reading is cached for 12 hours and retried every 10 seconds while the mouse sleeps.
+
+4. **ATK / VXE wireless mice (373B:1216)**  
    Read-only protocol 2 query: usage page `0xFF05`, Report ID `0x08`; sends the query only when VID/PID/usage page/report length match exactly.
 
-4. **DARKRIM wireless headsets (3654:6901)**  
+5. **DARKRIM wireless headsets (3654:6901)**  
    Read-only Jieli JL_RCSP TLV query: usage page `0xFF02`, usage `0x0002`, 65-byte frame, CRC16-CCITT-FALSE. Only the battery TLV `0x01` is queried; no EQ/write commands.
 
-5. **Windows Bluetooth battery property**  
-   For Bluetooth mice, keyboards, headsets, etc. that report battery to Windows. Both the Bluetooth class and an all-classes pass are tried to cover some Hands-Free/AG Audio nodes. A property value of 0 is treated as “unknown/not connected”, not 0%.
+6. **Windows Bluetooth battery property**  
+   For Bluetooth mice, keyboards, headsets, etc. that report battery to Windows. Both the Bluetooth class and an all-classes pass are tried to cover some Hands-Free/AG Audio nodes. A property value of 0 is treated as “unknown/not connected”, not 0%. **Entries whose battery value has not been refreshed for more than 7 days are treated as stale and skipped** (for example, a mouse switched to 2.4G mode keeps its last Bluetooth value forever).
 
 > **2.4 GHz compatibility**: there is no universal 2.4 GHz battery standard. Many vendors (including some Razer, Corsair, SteelSeries, and budget mice) only expose battery in their own driver or private protocol and never report it to Windows. Such devices cannot be read by a generic tool; this is not a Gear-Batt bug.
 >
-> This machine has no Logitech 2.4 GHz, ATK/VXE, or DARKRIM hardware. Those paths are implemented and covered by protocol/CRC self-tests, but have not yet been validated on real hardware. Use `--diag --verbose` or the collector report to inspect actual probe results.
+> Logitech 2.4 GHz, ATK/VXE, and DARKRIM paths are implemented and covered by protocol/CRC self-tests but not yet validated on the corresponding hardware; CX 260D:1163 was validated on a real mouse on this machine via captured traffic. Use `--diag --verbose` or the collector report to inspect actual probe results.
 
 ## Usage
 
@@ -173,7 +177,8 @@ Source layout:
 ## Known limitations
 
 - v1 displays one device at a time; select it manually when multiple devices are present.
-- Only devices that report battery through Windows, Logitech HID++, ATK/VXE, DARKRIM, or the Bluetooth battery property are supported.
+- Only devices that report battery through Windows, Logitech HID++, CX 2.4G, ATK/VXE, DARKRIM, or the Bluetooth battery property are supported.
+- CX/ATK-family mice do not answer battery queries while asleep: move the mouse once for the first reading; a successful reading is then cached for 12 hours and retried every 10 seconds while the mouse sleeps.
 - HID++ 1.0, Logitech private encrypted channels, and Razer/Corsair/SteelSeries private protocols are not implemented.
 - If Logitech G HUB / Options+ or similar vendor software holds the HID interface exclusively, HID++ reads may fail; close the vendor software and retry.
 - A standard HID Battery Strength Feature Report fallback is not yet in the main app; the Windows battery interface covers common cases, and the collector records parsed value caps for future support.
@@ -191,6 +196,7 @@ Source layout:
 
 ## Version
 
+- **v1.4.0**: added CX 2.4G receiver support (e.g. 260D:1163, reverse-engineered from captured traffic on a real mouse: percentage/wired flag/battery voltage); the tooltip and menu now show the battery voltage; stale Bluetooth entries (battery not refreshed for 7+ days, e.g. a mouse switched to 2.4G mode) are no longer shown as a fixed 100%; the collector gained a CX probe.
 - **v1.3.1**: main app and collector UI follow the Windows display language (Chinese/English); override with `--lang zh|en`.
 - **v1.3.0**: device attach/remove and power-status changes refresh immediately; 5-second fast polling while charging or at ≤10%; low-battery card no longer auto-closes and must be dismissed with ×.
 - **v1.2.0**: low-battery card for the selected device below 5% while discharging (silent, no focus stealing, once per episode).
