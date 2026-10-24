@@ -128,6 +128,7 @@ namespace GearBatt
     internal sealed class CxBattery
     {
         public int Percent = -1;
+        public bool PercentApproximate;
         public bool Wired;
         public int VoltageMv;
         public string Detail = "";
@@ -229,6 +230,7 @@ namespace GearBatt
                 device.Id = "cx:" + info.InstanceId;
                 device.Name = name;
                 device.Percent = battery.Percent;
+                device.PercentApproximate = battery.PercentApproximate;
                 device.Charging = battery.Wired;
                 device.VoltageMv = battery.VoltageMv;
                 device.Source = "2.4G";
@@ -317,9 +319,6 @@ namespace GearBatt
             if (report[0] != 0x08 || report[1] != 0x04)
                 return null;
 
-            int percent = report[6];
-            if (percent < 0 || percent > 100)
-                percent = -1;
             bool wired = report[7] != 0;
 
             int bigEndian = (report[8] << 8) | report[9];
@@ -331,14 +330,73 @@ namespace GearBatt
                 millivolts = 0;
 
             CxBattery battery = new CxBattery();
-            battery.Percent = percent;
             battery.Wired = wired;
             battery.VoltageMv = millivolts;
+            if (wired)
+            {
+                // While charging the firmware reports the real gauge
+                // percentage at byte 6 (observed: 0x5F = 95%).
+                int percent = report[6];
+                if (percent < 0 || percent > 100)
+                    percent = -1;
+                battery.Percent = percent;
+            }
+            else
+            {
+                // On battery byte 6 is pinned at 100 and carries no
+                // information (observed 0x64 at 4.32V and at 4.288V);
+                // the resting voltage at bytes 8-9 is the only signal.
+                battery.Percent = CxVoltageToPercent(millivolts);
+                battery.PercentApproximate = battery.Percent >= 0;
+            }
             battery.Detail = string.Format(
                 System.Globalization.CultureInfo.InvariantCulture,
-                "level={0} wired={1} voltage={2}mV mode={3}",
-                percent, wired, millivolts, report[5]);
+                "level={0}{1} wired={2} voltage={3}mV mode={4}",
+                battery.Percent, battery.PercentApproximate ? "(est)" : "",
+                wired, millivolts, report[5]);
             return battery;
+        }
+
+        // Resting-voltage curve anchored on captured data from this mouse:
+        // 4320mV was full (gauge 100%) and 4288mV matched a 95% gauge
+        // reading while charging. Values below are linearly interpolated.
+        private static readonly int[] VoltageCurve = new int[]
+        {
+            4300, 100,
+            4280, 95,
+            4200, 85,
+            4100, 75,
+            4000, 60,
+            3900, 45,
+            3800, 30,
+            3700, 18,
+            3600, 10,
+            3500, 5,
+            3400, 0
+        };
+
+        internal static int CxVoltageToPercent(int millivolts)
+        {
+            if (millivolts <= 0)
+                return -1;
+            if (millivolts >= VoltageCurve[0])
+                return 100;
+            for (int i = 0; i < VoltageCurve.Length - 2; i += 2)
+            {
+                int highMv = VoltageCurve[i];
+                int highPct = VoltageCurve[i + 1];
+                int lowMv = VoltageCurve[i + 2];
+                int lowPct = VoltageCurve[i + 3];
+                if (millivolts <= highMv && millivolts >= lowMv)
+                {
+                    if (highMv == lowMv)
+                        return highPct;
+                    double ratio = (double)(millivolts - lowMv) /
+                        (highMv - lowMv);
+                    return (int)Math.Round(lowPct + ratio * (highPct - lowPct));
+                }
+            }
+            return 0;
         }
     }
 

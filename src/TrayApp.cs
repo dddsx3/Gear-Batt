@@ -494,7 +494,7 @@ namespace GearBatt
             if (L10n.Chinese)
             {
                 text =
-                    "Gear-Batt 1.4.0\n\n" +
+                    "Gear-Batt 1.4.1\n\n" +
                     "显示所选无线设备的电量与充电状态。\n\n" +
                 "支持来源：\n" +
                 "• Windows 电池接口（部分 2.4G 接收器）\n" +
@@ -515,7 +515,7 @@ namespace GearBatt
             else
             {
                 text =
-                    "Gear-Batt 1.4.0\n\n" +
+                    "Gear-Batt 1.4.1\n\n" +
                     "Shows the battery and charging state of the selected wireless device.\n\n" +
                     "Supported sources:\n" +
                     "• Windows battery interface (some 2.4 GHz receivers)\n" +

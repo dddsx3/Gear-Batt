@@ -63,8 +63,11 @@ The main app menu also has “Help adapt my device…” (帮助适配我的设�
    - `0x0005` Device Name
 
 3. **CX 2.4G receivers (e.g. 260D:1163)**  
-   Read-only battery query: usage page `0xFF02`, 17-byte bidirectional reports, Report ID `0x08` command `0x04` (the same framing as ATK/VXE "protocol 1"). The reply carries the percentage at byte 6, a wired/charging flag at byte 7, and the battery voltage in millivolts at bytes 8-9 (big endian). The tooltip and menu show the voltage (for example `4.32V`).
-   Note: these mice do not answer while asleep; move the mouse once for the first reading. Afterwards the last reading is cached for 12 hours and retried every 10 seconds while the mouse sleeps.
+   Read-only battery query: usage page `0xFF02`, 17-byte bidirectional reports, Report ID `0x08` command `0x04` (the same framing as ATK/VXE "protocol 1"). Decoding confirmed by capturing both states on a real mouse:
+   - **While charging** (byte 7 nonzero): byte 6 is the real gauge percentage from the charger, bytes 8-9 the charging voltage.
+   - **On battery** (byte 7 zero): the firmware pins byte 6 at 100 (meaningless), so the level is estimated from the resting voltage at bytes 8-9 and shown with an `≈` marker (curve anchored on 4.32V = full and 4.288V ≈ 95% measured on this mouse).
+   The tooltip and menu always show the voltage (for example `4.29V`) as evidence of live data.
+   Note: these mice do not answer while asleep; move the mouse once for a reading. The last reading is cached for 12 hours and retried every 10 seconds while the mouse sleeps.
 
 4. **ATK / VXE wireless mice (373B:1216)**  
    Read-only protocol 2 query: usage page `0xFF05`, Report ID `0x08`; sends the query only when VID/PID/usage page/report length match exactly.
@@ -196,7 +199,8 @@ Source layout:
 
 ## Version
 
-- **v1.4.0**: added CX 2.4G receiver support (e.g. 260D:1163, reverse-engineered from captured traffic on a real mouse: percentage/wired flag/battery voltage); the tooltip and menu now show the battery voltage; stale Bluetooth entries (battery not refreshed for 7+ days, e.g. a mouse switched to 2.4G mode) are no longer shown as a fixed 100%; the collector gained a CX probe.
+- **v1.4.1**: fixed the CX battery decoding — on battery the firmware always replies 100%, so the level is now estimated from the resting voltage (shown with `≈`); while charging byte 6 is the real charger-gauge percentage (measured 95% at 4.38V).
+- **v1.4.0**: added CX 2.4G receiver support (e.g. 260D:1163, reverse-engineered from captured traffic on a real mouse); the tooltip and menu now show the battery voltage; stale Bluetooth entries (battery not refreshed for 7+ days) are no longer shown as a fixed 100%; the collector gained a CX probe.
 - **v1.3.1**: main app and collector UI follow the Windows display language (Chinese/English); override with `--lang zh|en`.
 - **v1.3.0**: device attach/remove and power-status changes refresh immediately; 5-second fast polling while charging or at ≤10%; low-battery card no longer auto-closes and must be dismissed with ×.
 - **v1.2.0**: low-battery card for the selected device below 5% while discharging (silent, no focus stealing, once per episode).

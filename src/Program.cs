@@ -255,25 +255,48 @@ namespace GearBatt
                     new byte[] { 0x08, 0x72, 0, 0, 0, 0x07, 0, 87 },
                     out atkPercent) && atkPercent == 87);
 
-            byte[] cxFull = new byte[]
+            byte[] cxCharging = new byte[]
+            {
+                0x08, 0x04, 0x00, 0x00, 0x00, 0x02, 0x5F, 0x01,
+                0x11, 0x1F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xB7
+            };
+            CxBattery cxWired = CxReceiverProvider.ParseResponse(cxCharging);
+            Check(sb, ref failures, "CX charging gauge",
+                cxWired != null && cxWired.Percent == 95 &&
+                !cxWired.PercentApproximate && cxWired.Wired &&
+                cxWired.VoltageMv == 4383);
+
+            byte[] cxBatteryFull = new byte[]
             {
                 0x08, 0x04, 0x00, 0x00, 0x00, 0x02, 0x64, 0x00,
                 0x10, 0xE0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF3
             };
-            CxBattery cxParsed = CxReceiverProvider.ParseResponse(cxFull);
-            Check(sb, ref failures, "CX full battery",
-                cxParsed != null && cxParsed.Percent == 100 &&
-                !cxParsed.Wired && cxParsed.VoltageMv == 4320);
+            CxBattery cxFull = CxReceiverProvider.ParseResponse(cxBatteryFull);
+            Check(sb, ref failures, "CX battery full from voltage",
+                cxFull != null && cxFull.Percent == 100 &&
+                cxFull.PercentApproximate && !cxFull.Wired &&
+                cxFull.VoltageMv == 4320);
 
-            byte[] cxMid = new byte[]
+            byte[] cxBatteryMid = new byte[]
             {
-                0x08, 0x04, 0x00, 0x00, 0x00, 0x02, 0x37, 0x01,
-                0x0F, 0xA0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+                0x08, 0x04, 0x00, 0x00, 0x00, 0x02, 0x64, 0x00,
+                0x10, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x13
             };
-            CxBattery cxWired = CxReceiverProvider.ParseResponse(cxMid);
-            Check(sb, ref failures, "CX mid battery wired",
-                cxWired != null && cxWired.Percent == 55 &&
-                cxWired.Wired && cxWired.VoltageMv == 4000);
+            CxBattery cxMid = CxReceiverProvider.ParseResponse(cxBatteryMid);
+            Check(sb, ref failures, "CX battery ~97% from 4.288V",
+                cxMid != null && cxMid.Percent >= 95 && cxMid.Percent <= 100 &&
+                cxMid.PercentApproximate && !cxMid.Wired &&
+                cxMid.VoltageMv == 4288);
+
+            byte[] cxBatteryLow = new byte[]
+            {
+                0x08, 0x04, 0x00, 0x00, 0x00, 0x02, 0x64, 0x00,
+                0x0E, 0x74, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            };
+            CxBattery cxLow = CxReceiverProvider.ParseResponse(cxBatteryLow);
+            Check(sb, ref failures, "CX battery ~18% from 3.7V",
+                cxLow != null && cxLow.Percent >= 15 && cxLow.Percent <= 22 &&
+                cxLow.PercentApproximate && cxLow.VoltageMv == 3700);
 
             byte[] darkrimQuery = DarkrimProtocol.BuildBatteryQuery();
             Check(sb, ref failures, "DARKRIM query CRC",
